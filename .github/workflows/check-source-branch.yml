@@ -1,0 +1,9 @@
+# .github/workflows/check-source-branch.yml
+name: Check source branch
+on:
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  check:
+    uses: FlorexLabs/shared-workflows/.github/workflows/check-source-branch.yml@master
