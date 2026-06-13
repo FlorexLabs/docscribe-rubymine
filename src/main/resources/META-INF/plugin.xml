@@ -1,0 +1,83 @@
+<idea-plugin>
+    <id>com.florexlabs.docscribe</id>
+    <name>DocScribe</name>
+    <vendor>FlorexLabs</vendor>
+
+    <description><![CDATA[
+        <p>Auto-generate inline YARD documentation for Ruby methods using <a href="https://github.com/unurgunite/docscribe">docscribe</a>.</p>
+        <h3>Features</h3>
+        <ul>
+            <li>Check Ruby files for missing YARD documentation</li>
+            <li>Apply safe fixes (add required tags)</li>
+            <li>Apply aggressive fixes (add full documentation)</li>
+            <li>Inline diagnostics on file open and save</li>
+        </ul>
+    ]]></description>
+
+    <change-notes><![CDATA[
+        Initial release.
+    ]]></change-notes>
+
+    <version>0.1.0</version>
+    <idea-version since-build="261." until-build="261.*"/>
+
+    <depends>com.intellij.modules.platform</depends>
+    <depends>com.intellij.modules.ruby</depends>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <annotator language="Ruby"
+                   implementationClass="com.florexlabs.docscribe.annotator.DocscribeAnnotator"/>
+
+        <applicationConfigurable
+                groupId="tools"
+                displayName="DocScribe"
+                id="com.florexlabs.docscribe.settings"
+                instance="com.florexlabs.docscribe.settings.DocscribeSettingsConfigurable"/>
+    </extensions>
+
+    <actions>
+        <action id="com.florexlabs.docscribe.CheckFileAction"
+                class="com.florexlabs.docscribe.actions.CheckFileAction"
+                text="DocScribe: Check Current File"
+                description="Run docscribe check on the current Ruby file">
+            <keyboard-shortcut keymap="$default"
+                               first-keystroke="ctrl shift D"
+                               second-keystroke="C"/>
+            <add-to-group group-id="EditorPopupMenu"
+                          anchor="first"/>
+        </action>
+
+        <action id="com.florexlabs.docscribe.CheckWorkspaceAction"
+                class="com.florexlabs.docscribe.actions.CheckWorkspaceAction"
+                text="DocScribe: Check Entire Workspace"
+                description="Run docscribe check on all Ruby files in the project">
+            <keyboard-shortcut keymap="$default"
+                               first-keystroke="ctrl shift D"
+                               second-keystroke="W"/>
+        </action>
+
+        <action id="com.florexlabs.docscribe.SafeFixAction"
+                class="com.florexlabs.docscribe.actions.SafeFixAction"
+                text="DocScribe: Apply Safe Fixes"
+                description="Apply docscribe safe fixes to current file">
+            <keyboard-shortcut keymap="$default"
+                               first-keystroke="ctrl shift D"
+                               second-keystroke="S"/>
+            <add-to-group group-id="EditorPopupMenu"
+                          anchor="after"
+                          relative-to-action="com.florexlabs.docscribe.CheckFileAction"/>
+        </action>
+
+        <action id="com.florexlabs.docscribe.AggressiveFixAction"
+                class="com.florexlabs.docscribe.actions.AggressiveFixAction"
+                text="DocScribe: Apply Aggressive Fixes"
+                description="Apply docscribe aggressive fixes to current file">
+            <keyboard-shortcut keymap="$default"
+                               first-keystroke="ctrl shift D"
+                               second-keystroke="A"/>
+            <add-to-group group-id="EditorPopupMenu"
+                          anchor="after"
+                          relative-to-action="com.florexlabs.docscribe.SafeFixAction"/>
+        </action>
+    </actions>
+</idea-plugin>
