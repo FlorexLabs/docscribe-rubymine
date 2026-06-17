@@ -2,11 +2,13 @@ package com.florexlabs.docscribe.settings
 
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.PersistentStateComponent
+import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.State
 import com.intellij.openapi.components.Storage
 import com.intellij.util.xmlb.XmlSerializerUtil
 
 @State(name = "DocscribeSettings", storages = [Storage("docscribe-settings.xml")])
+@Service
 class DocscribeSettings : PersistentStateComponent<DocscribeSettings> {
     var commandPath: String = "docscribe"
     var useBundleExec: Boolean = false

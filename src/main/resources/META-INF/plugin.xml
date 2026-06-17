@@ -25,6 +25,8 @@
     <depends>com.intellij.modules.ruby</depends>
 
     <extensions defaultExtensionNs="com.intellij">
+        <applicationService serviceImplementation="com.florexlabs.docscribe.settings.DocscribeSettings"/>
+
         <notificationGroup id="DocScribe" displayType="BALLOON" key="DocScribe notifications"/>
 
         <annotator language="Ruby"
