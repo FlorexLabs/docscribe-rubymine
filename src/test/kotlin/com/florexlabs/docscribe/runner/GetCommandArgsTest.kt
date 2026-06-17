@@ -5,141 +5,153 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class GetCommandArgsTest {
-
     @Test
     fun `check mode with defaults returns empty args`() {
-        val args = DocscribeRunner.getCommandArgs(
-            strategy = DocscribeStrategy.CHECK,
-            formatJson = false,
-            useRbs = false
-        )
+        val args =
+            DocscribeRunner.getCommandArgs(
+                strategy = DocscribeStrategy.CHECK,
+                formatJson = false,
+                useRbs = false,
+            )
         assertTrue(args.isEmpty())
     }
 
     @Test
     fun `check mode with json adds format flag`() {
-        val args = DocscribeRunner.getCommandArgs(
-            strategy = DocscribeStrategy.CHECK,
-            formatJson = true,
-            useRbs = false
-        )
+        val args =
+            DocscribeRunner.getCommandArgs(
+                strategy = DocscribeStrategy.CHECK,
+                formatJson = true,
+                useRbs = false,
+            )
         assertEquals(listOf("--format", "json"), args)
     }
 
     @Test
     fun `check mode with json and rbs adds both flags`() {
-        val args = DocscribeRunner.getCommandArgs(
-            strategy = DocscribeStrategy.CHECK,
-            formatJson = true,
-            useRbs = true
-        )
+        val args =
+            DocscribeRunner.getCommandArgs(
+                strategy = DocscribeStrategy.CHECK,
+                formatJson = true,
+                useRbs = true,
+            )
         assertEquals(listOf("--format", "json", "--rbs-collection"), args)
     }
 
     @Test
     fun `check mode with json, rbs and file path adds all`() {
-        val args = DocscribeRunner.getCommandArgs(
-            strategy = DocscribeStrategy.CHECK,
-            formatJson = true,
-            useRbs = true,
-            filePath = "src/app.rb"
-        )
+        val args =
+            DocscribeRunner.getCommandArgs(
+                strategy = DocscribeStrategy.CHECK,
+                formatJson = true,
+                useRbs = true,
+                filePath = "src/app.rb",
+            )
         assertEquals(listOf("--format", "json", "--rbs-collection", "src/app.rb"), args)
     }
 
     @Test
     fun `safe mode adds min a flag`() {
-        val args = DocscribeRunner.getCommandArgs(
-            strategy = DocscribeStrategy.SAFE,
-            formatJson = true,
-            useRbs = false
-        )
+        val args =
+            DocscribeRunner.getCommandArgs(
+                strategy = DocscribeStrategy.SAFE,
+                formatJson = true,
+                useRbs = false,
+            )
         assertEquals(listOf("-a"), args)
     }
 
     @Test
     fun `safe mode ignores json flag`() {
-        val args = DocscribeRunner.getCommandArgs(
-            strategy = DocscribeStrategy.SAFE,
-            formatJson = true,
-            useRbs = false,
-            filePath = "foo.rb"
-        )
+        val args =
+            DocscribeRunner.getCommandArgs(
+                strategy = DocscribeStrategy.SAFE,
+                formatJson = true,
+                useRbs = false,
+                filePath = "foo.rb",
+            )
         assertEquals(listOf("-a", "foo.rb"), args)
     }
 
     @Test
     fun `aggressive mode adds min A flag`() {
-        val args = DocscribeRunner.getCommandArgs(
-            strategy = DocscribeStrategy.AGGRESSIVE,
-            formatJson = false,
-            useRbs = false
-        )
+        val args =
+            DocscribeRunner.getCommandArgs(
+                strategy = DocscribeStrategy.AGGRESSIVE,
+                formatJson = false,
+                useRbs = false,
+            )
         assertEquals(listOf("-A", "-k"), args)
     }
 
     @Test
     fun `aggressive mode with rbs and file`() {
-        val args = DocscribeRunner.getCommandArgs(
-            strategy = DocscribeStrategy.AGGRESSIVE,
-            formatJson = true,
-            useRbs = true,
-            filePath = "lib/foo.rb"
-        )
+        val args =
+            DocscribeRunner.getCommandArgs(
+                strategy = DocscribeStrategy.AGGRESSIVE,
+                formatJson = true,
+                useRbs = true,
+                filePath = "lib/foo.rb",
+            )
         assertEquals(listOf("-A", "-k", "--rbs-collection", "lib/foo.rb"), args)
     }
 
     @Test
     fun `aggressive mode adds k flag`() {
-        val args = DocscribeRunner.getCommandArgs(
-            strategy = DocscribeStrategy.AGGRESSIVE,
-            formatJson = false,
-            useRbs = false
-        )
+        val args =
+            DocscribeRunner.getCommandArgs(
+                strategy = DocscribeStrategy.AGGRESSIVE,
+                formatJson = false,
+                useRbs = false,
+            )
         assertEquals(listOf("-A", "-k"), args)
     }
 
     @Test
     fun `aggressive mode with boilerplate adds B flag`() {
-        val args = DocscribeRunner.getCommandArgs(
-            strategy = DocscribeStrategy.AGGRESSIVE,
-            formatJson = false,
-            useRbs = false,
-            omitBoilerplate = true
-        )
+        val args =
+            DocscribeRunner.getCommandArgs(
+                strategy = DocscribeStrategy.AGGRESSIVE,
+                formatJson = false,
+                useRbs = false,
+                omitBoilerplate = true,
+            )
         assertEquals(listOf("-A", "-k", "-B"), args)
     }
 
     @Test
     fun `aggressive mode without boilerplate omits B flag`() {
-        val args = DocscribeRunner.getCommandArgs(
-            strategy = DocscribeStrategy.AGGRESSIVE,
-            formatJson = false,
-            useRbs = false,
-            omitBoilerplate = false
-        )
+        val args =
+            DocscribeRunner.getCommandArgs(
+                strategy = DocscribeStrategy.AGGRESSIVE,
+                formatJson = false,
+                useRbs = false,
+                omitBoilerplate = false,
+            )
         assertEquals(listOf("-A", "-k"), args)
     }
 
     @Test
     fun `safe mode with boilerplate adds B flag`() {
-        val args = DocscribeRunner.getCommandArgs(
-            strategy = DocscribeStrategy.SAFE,
-            formatJson = false,
-            useRbs = false,
-            omitBoilerplate = true
-        )
+        val args =
+            DocscribeRunner.getCommandArgs(
+                strategy = DocscribeStrategy.SAFE,
+                formatJson = false,
+                useRbs = false,
+                omitBoilerplate = true,
+            )
         assertEquals(listOf("-a", "-B"), args)
     }
 
     @Test
     fun `safe mode without boilerplate omits B flag`() {
-        val args = DocscribeRunner.getCommandArgs(
-            strategy = DocscribeStrategy.SAFE,
-            formatJson = false,
-            useRbs = false,
-            omitBoilerplate = false
-        )
+        val args =
+            DocscribeRunner.getCommandArgs(
+                strategy = DocscribeStrategy.SAFE,
+                formatJson = false,
+                useRbs = false,
+                omitBoilerplate = false,
+            )
         assertEquals(listOf("-a"), args)
     }
 }

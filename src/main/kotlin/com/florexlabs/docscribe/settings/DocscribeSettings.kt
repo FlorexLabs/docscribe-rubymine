@@ -24,7 +24,6 @@ class DocscribeSettings : PersistentStateComponent<DocscribeSettings> {
 
     companion object {
         @JvmStatic
-        fun getInstance(): DocscribeSettings =
-            ApplicationManager.getApplication().getService(DocscribeSettings::class.java)
+        fun getInstance(): DocscribeSettings = ApplicationManager.getApplication().getService(DocscribeSettings::class.java)
     }
 }

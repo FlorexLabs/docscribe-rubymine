@@ -3,7 +3,6 @@ package com.florexlabs.docscribe.settings
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 
 class DocscribeSettingsConfigurableTest : BasePlatformTestCase() {
-
     fun testDisplayName() {
         val c = DocscribeSettingsConfigurable()
         assertEquals("DocScribe", c.displayName)

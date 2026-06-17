@@ -5,21 +5,22 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 
 class ParseTextOutputTest {
-
     @Test
     fun `parses OK summary`() {
-        val result = DocscribeOutputParser.parseTextOutput(
-            "Docscribe: OK (5 files checked)"
-        )!!
+        val result =
+            DocscribeOutputParser.parseTextOutput(
+                "Docscribe: OK (5 files checked)",
+            )!!
         assertEquals("OK", result.summary.status)
         assertEquals(5, result.summary.inspectedCount)
     }
 
     @Test
     fun `parses OK summary with type mismatches`() {
-        val result = DocscribeOutputParser.parseTextOutput(
-            "Docscribe: OK (5 files checked, 2 with type mismatches)"
-        )!!
+        val result =
+            DocscribeOutputParser.parseTextOutput(
+                "Docscribe: OK (5 files checked, 2 with type mismatches)",
+            )!!
         assertEquals("OK", result.summary.status)
         assertEquals(5, result.summary.inspectedCount)
         assertEquals(2, result.summary.typeMismatchCount)
@@ -27,9 +28,10 @@ class ParseTextOutputTest {
 
     @Test
     fun `parses FAILED summary`() {
-        val result = DocscribeOutputParser.parseTextOutput(
-            "Docscribe: FAILED (2 need updates, 1 type mismatches, 0 errors, 3 ok)"
-        )!!
+        val result =
+            DocscribeOutputParser.parseTextOutput(
+                "Docscribe: FAILED (2 need updates, 1 type mismatches, 0 errors, 3 ok)",
+            )!!
         assertEquals("FAILED", result.summary.status)
         assertEquals(2, result.summary.needsUpdateCount)
         assertEquals(1, result.summary.typeMismatchCount)
@@ -39,14 +41,15 @@ class ParseTextOutputTest {
 
     @Test
     fun `parses Would update sections`() {
-        val text = """
+        val text =
+            """
             Would update: foo/bar.rb
               - missing @param [String] name for Foo#bar at line 5
               - missing @return [Integer] for Foo#bar at line 5
             Would update: lib/utils.rb
               - missing @param [String] input for Utils.parse at line 12
             Docscribe: FAILED (2 need updates, 0 type mismatches, 0 errors, 3 ok)
-        """.trimIndent()
+            """.trimIndent()
         val result = DocscribeOutputParser.parseTextOutput(text)!!
         assertEquals(2, result.wouldUpdateFiles.size)
         assertEquals("foo/bar.rb", result.wouldUpdateFiles[0].first)
@@ -57,11 +60,12 @@ class ParseTextOutputTest {
 
     @Test
     fun `parses type mismatches and error sections`() {
-        val text = """
+        val text =
+            """
             Type mismatches: types.rb
             Error processing: broken.rb
             Docscribe: FAILED (0 need updates, 1 type mismatches, 1 errors, 0 ok)
-        """.trimIndent()
+            """.trimIndent()
         val result = DocscribeOutputParser.parseTextOutput(text)!!
         assertEquals(listOf("types.rb"), result.typeMismatchFiles)
         assertEquals(listOf("broken.rb"), result.errorFiles)
@@ -69,9 +73,10 @@ class ParseTextOutputTest {
 
     @Test
     fun `parses updated summary for write mode`() {
-        val result = DocscribeOutputParser.parseTextOutput(
-            "Docscribe: updated 3 file(s)"
-        )!!
+        val result =
+            DocscribeOutputParser.parseTextOutput(
+                "Docscribe: updated 3 file(s)",
+            )!!
         assertEquals("UPDATED", result.summary.status)
         assertEquals(3, result.summary.updatedCount)
     }

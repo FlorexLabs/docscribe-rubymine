@@ -4,6 +4,8 @@ plugins {
     id("java")
     id("org.jetbrains.kotlin.jvm") version "2.3.0"
     id("org.jetbrains.intellij.platform") version "2.16.0"
+    id("com.diffplug.spotless") version "8.6.0"
+    id("dev.detekt") version "2.0.0-alpha.4"
 }
 
 group = "com.florexlabs"
@@ -37,14 +39,15 @@ intellijPlatform {
             untilBuild = providers.gradleProperty("pluginUntilBuild")
         }
 
-        changeNotes = """
+        changeNotes =
+            """
             <p>Initial release of DocScribe for RubyMine.</p>
             <ul>
                 <li>Auto-generate YARD documentation for Ruby methods</li>
                 <li>Check file / workspace diagnostics</li>
                 <li>Safe and aggressive fix actions</li>
             </ul>
-        """.trimIndent()
+            """.trimIndent()
     }
 
     signing {
@@ -56,6 +59,22 @@ intellijPlatform {
     publishing {
         token = providers.environmentVariable("JETBRAINS_TOKEN")
     }
+}
+
+spotless {
+    kotlin {
+        ktlint()
+        target("src/**/*.kt")
+    }
+    kotlinGradle {
+        ktlint()
+        target("*.kts")
+    }
+}
+
+detekt {
+    buildUponDefaultConfig = true
+    config.setFrom(file("config/detekt/detekt.yml"))
 }
 
 tasks {

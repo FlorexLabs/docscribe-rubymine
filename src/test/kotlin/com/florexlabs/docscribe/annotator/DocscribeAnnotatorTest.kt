@@ -3,7 +3,6 @@ package com.florexlabs.docscribe.annotator
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 
 class DocscribeAnnotatorTest : BasePlatformTestCase() {
-
     private val annotator = DocscribeAnnotator()
 
     fun testCollectInformationReturnsNullForNonRubyFile() {

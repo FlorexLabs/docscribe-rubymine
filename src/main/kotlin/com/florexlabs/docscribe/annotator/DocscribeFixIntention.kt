@@ -12,29 +12,39 @@ import com.intellij.psi.PsiFile
 
 class DocscribeFixIntention : IntentionAction {
     override fun getText(): String = "Apply docscribe fix"
+
     override fun getFamilyName(): String = "DocScribe"
 
-    override fun isAvailable(project: Project, editor: Editor?, file: PsiFile?): Boolean {
-        return file != null && file.name.endsWith(".rb")
-    }
+    override fun isAvailable(
+        project: Project,
+        editor: Editor?,
+        file: PsiFile?,
+    ): Boolean = file != null && file.name.endsWith(".rb")
 
-    override fun invoke(project: Project, editor: Editor?, file: PsiFile?) {
+    override fun invoke(
+        project: Project,
+        editor: Editor?,
+        file: PsiFile?,
+    ) {
         val psiFile = file ?: return
         val vFile = psiFile.virtualFile ?: return
         val projectRoot = DocscribeRunner.findProjectRoot(vFile.path) ?: return
-        val options = RunOptions(
-            projectDir = projectRoot,
-            file = vFile.path,
-            strategy = DocscribeStrategy.SAFE,
-            formatJson = false
-        )
+        val options =
+            RunOptions(
+                projectDir = projectRoot,
+                file = vFile.path,
+                strategy = DocscribeStrategy.SAFE,
+                formatJson = false,
+            )
         val result = DocscribeRunner.runDocscribe(options)
         val group = NotificationGroupManager.getInstance().getNotificationGroup("DocScribe")
         if (result.exitCode >= 2) {
-            group.createNotification("DocScribe: failed to apply fix", NotificationType.ERROR)
+            group
+                .createNotification("DocScribe: failed to apply fix", NotificationType.ERROR)
                 .notify(project)
         } else {
-            group.createNotification("DocScribe: fix applied", NotificationType.INFORMATION)
+            group
+                .createNotification("DocScribe: fix applied", NotificationType.INFORMATION)
                 .notify(project)
         }
     }

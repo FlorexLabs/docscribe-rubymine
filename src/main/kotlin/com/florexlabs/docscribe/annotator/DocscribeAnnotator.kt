@@ -13,11 +13,10 @@ import com.intellij.psi.PsiFile
 
 data class AnnotatorFileInfo(
     val filePath: String,
-    val projectDir: String
+    val projectDir: String,
 )
 
 class DocscribeAnnotator : ExternalAnnotator<AnnotatorFileInfo, com.florexlabs.docscribe.runner.DocscribeOutput>() {
-
     override fun collectInformation(file: PsiFile): AnnotatorFileInfo? {
         if (!file.name.endsWith(".rb")) return null
         val vFile = file.virtualFile ?: return null
@@ -27,12 +26,13 @@ class DocscribeAnnotator : ExternalAnnotator<AnnotatorFileInfo, com.florexlabs.d
 
     override fun doAnnotate(info: AnnotatorFileInfo): com.florexlabs.docscribe.runner.DocscribeOutput? {
         val projectRoot = DocscribeRunner.findProjectRoot(info.filePath) ?: return null
-        val options = RunOptions(
-            projectDir = projectRoot,
-            file = info.filePath,
-            strategy = DocscribeStrategy.CHECK,
-            formatJson = true
-        )
+        val options =
+            RunOptions(
+                projectDir = projectRoot,
+                file = info.filePath,
+                strategy = DocscribeStrategy.CHECK,
+                formatJson = true,
+            )
         val result = DocscribeRunner.runDocscribe(options)
         if (!result.success || result.stdout.isBlank()) return null
         return DocscribeOutputParser.parseJson(result.stdout)
@@ -41,7 +41,7 @@ class DocscribeAnnotator : ExternalAnnotator<AnnotatorFileInfo, com.florexlabs.d
     override fun apply(
         file: PsiFile,
         annotationResult: com.florexlabs.docscribe.runner.DocscribeOutput?,
-        holder: AnnotationHolder
+        holder: AnnotationHolder,
     ) {
         if (annotationResult == null) return
         val document = PsiDocumentManager.getInstance(file.project).getDocument(file) ?: return
@@ -51,12 +51,14 @@ class DocscribeAnnotator : ExternalAnnotator<AnnotatorFileInfo, com.florexlabs.d
                 val lineStart = document.getLineStartOffset(line)
                 val lineEnd = document.getLineEndOffset(line)
                 val range = TextRange(lineStart, lineEnd)
-                val severity = if (offense.severity == "fatal") {
-                    HighlightSeverity.ERROR
-                } else {
-                    HighlightSeverity.WARNING
-                }
-                holder.newAnnotation(severity, offense.message)
+                val severity =
+                    if (offense.severity == "fatal") {
+                        HighlightSeverity.ERROR
+                    } else {
+                        HighlightSeverity.WARNING
+                    }
+                holder
+                    .newAnnotation(severity, offense.message)
                     .range(range)
                     .withFix(DocscribeFixIntention())
                     .create()

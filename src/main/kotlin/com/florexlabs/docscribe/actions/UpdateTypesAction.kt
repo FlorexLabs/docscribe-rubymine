@@ -15,10 +15,11 @@ class UpdateTypesAction : AnAction() {
     override fun actionPerformed(e: AnActionEvent) {
         val project = e.project ?: return
         val projectDir = project.basePath ?: return
-        val projectRoot = DocscribeRunner.findProjectRoot(projectDir) ?: run {
-            notify(project, "No Gemfile found in project tree", NotificationType.ERROR)
-            return
-        }
+        val projectRoot =
+            DocscribeRunner.findProjectRoot(projectDir) ?: run {
+                notify(project, "No Gemfile found in project tree", NotificationType.ERROR)
+                return
+            }
         if (!DocscribeRunner.gemfileHasRbs("$projectRoot/Gemfile")) {
             notify(project, "RBS not found in Gemfile — update_types requires RBS", NotificationType.WARNING)
             return
@@ -28,10 +29,11 @@ class UpdateTypesAction : AnAction() {
             var exitCode = -1
 
             override fun run(indicator: ProgressIndicator) {
-                val options = RunOptions(
-                    projectDir = projectRoot,
-                    subcommand = "update_types"
-                )
+                val options =
+                    RunOptions(
+                        projectDir = projectRoot,
+                        subcommand = "update_types",
+                    )
                 val result = DocscribeRunner.runDocscribe(options)
                 exitCode = result.exitCode
             }
@@ -47,14 +49,16 @@ class UpdateTypesAction : AnAction() {
     }
 
     override fun update(e: AnActionEvent) {
-        val project = e.project ?: run {
-            e.presentation.isEnabledAndVisible = false
-            return
-        }
-        val projectDir = project.basePath ?: run {
-            e.presentation.isEnabledAndVisible = false
-            return
-        }
+        val project =
+            e.project ?: run {
+                e.presentation.isEnabledAndVisible = false
+                return
+            }
+        val projectDir =
+            project.basePath ?: run {
+                e.presentation.isEnabledAndVisible = false
+                return
+            }
         val projectRoot = DocscribeRunner.findProjectRoot(projectDir)
         if (projectRoot == null) {
             e.presentation.isEnabledAndVisible = false
@@ -65,7 +69,11 @@ class UpdateTypesAction : AnAction() {
 
     override fun getActionUpdateThread() = ActionUpdateThread.BGT
 
-    private fun notify(project: com.intellij.openapi.project.Project, content: String, type: NotificationType) {
+    private fun notify(
+        project: com.intellij.openapi.project.Project,
+        content: String,
+        type: NotificationType,
+    ) {
         val group = NotificationGroupManager.getInstance().getNotificationGroup("DocScribe")
         group.createNotification(content, type).notify(project)
     }

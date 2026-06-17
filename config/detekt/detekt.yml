@@ -1,0 +1,14 @@
+# detekt configuration file
+
+style:
+  ReturnCount:
+    active: true
+    max: 5
+  MaxLineLength:
+    active: true
+    maxLineLength: 140
+
+complexity:
+  CyclomaticComplexMethod:
+    active: true
+    allowedComplexity: 20

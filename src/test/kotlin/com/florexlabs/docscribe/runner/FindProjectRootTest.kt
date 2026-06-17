@@ -7,7 +7,6 @@ import org.junit.Test
 import org.junit.rules.TemporaryFolder
 
 class FindProjectRootTest {
-
     @Rule @JvmField
     val tempDir = TemporaryFolder()
 

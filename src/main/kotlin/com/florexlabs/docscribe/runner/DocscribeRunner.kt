@@ -6,7 +6,9 @@ import com.intellij.execution.process.CapturingProcessHandler
 import java.io.File
 
 enum class DocscribeStrategy {
-    CHECK, SAFE, AGGRESSIVE
+    CHECK,
+    SAFE,
+    AGGRESSIVE,
 }
 
 data class RunOptions(
@@ -14,7 +16,7 @@ data class RunOptions(
     val file: String? = null,
     val strategy: DocscribeStrategy = DocscribeStrategy.CHECK,
     val formatJson: Boolean = true,
-    val subcommand: String? = null
+    val subcommand: String? = null,
 )
 
 data class RunResult(
@@ -22,21 +24,30 @@ data class RunResult(
     val hasIssues: Boolean,
     val exitCode: Int,
     val stdout: String,
-    val stderr: String
+    val stderr: String,
 ) {
     @Suppress("unused")
     val output: String get() = if (stderr.isBlank()) stdout else "$stdout\n$stderr"
 }
 
 interface CommandExecutor {
-    fun execute(cmd: String, args: List<String>, cwd: String): RunResult
+    fun execute(
+        cmd: String,
+        args: List<String>,
+        cwd: String,
+    ): RunResult
 }
 
 class DefaultCommandExecutor : CommandExecutor {
-    override fun execute(cmd: String, args: List<String>, cwd: String): RunResult {
-        val commandLine = GeneralCommandLine(cmd)
-            .withParameters(args)
-            .withWorkDirectory(cwd)
+    override fun execute(
+        cmd: String,
+        args: List<String>,
+        cwd: String,
+    ): RunResult {
+        val commandLine =
+            GeneralCommandLine(cmd)
+                .withParameters(args)
+                .withWorkDirectory(cwd)
         val handler = CapturingProcessHandler(commandLine)
         val output = handler.runProcess()
         val exitCode = output.exitCode
@@ -45,16 +56,17 @@ class DefaultCommandExecutor : CommandExecutor {
             hasIssues = exitCode == 1,
             exitCode = exitCode,
             stdout = output.stdout,
-            stderr = output.stderr
+            stderr = output.stderr,
         )
     }
 }
 
 object DocscribeRunner {
+    private const val MAX_DEPTH = 20
 
     fun findProjectRoot(startPath: String): String? {
         var current = File(startPath).canonicalFile
-        repeat(20) {
+        repeat(MAX_DEPTH) {
             if (File(current, "Gemfile").exists()) return current.absolutePath
             val parent = current.parentFile ?: return null
             current = parent
@@ -62,21 +74,20 @@ object DocscribeRunner {
         return null
     }
 
-    fun gemfileHasRbs(gemfilePath: String): Boolean {
-        return try {
+    fun gemfileHasRbs(gemfilePath: String): Boolean =
+        try {
             val content = File(gemfilePath).readText()
             Regex("""gem\s+['"]rbs['"]""").containsMatchIn(content)
         } catch (_: Exception) {
             false
         }
-    }
 
     fun getCommandArgs(
         strategy: DocscribeStrategy,
         formatJson: Boolean,
         useRbs: Boolean,
         filePath: String? = null,
-        omitBoilerplate: Boolean = false
+        omitBoilerplate: Boolean = false,
     ): List<String> {
         val args = mutableListOf<String>()
         when (strategy) {
@@ -84,10 +95,12 @@ object DocscribeRunner {
                 args.add("-a")
                 if (omitBoilerplate) args.add("-B")
             }
+
             DocscribeStrategy.AGGRESSIVE -> {
                 args.addAll(listOf("-A", "-k"))
                 if (omitBoilerplate) args.add("-B")
             }
+
             DocscribeStrategy.CHECK -> {}
         }
         if (formatJson && strategy == DocscribeStrategy.CHECK) {
@@ -106,18 +119,19 @@ object DocscribeRunner {
     fun runDocscribe(
         options: RunOptions,
         settings: DocscribeSettings = DocscribeSettings.getInstance(),
-        executor: CommandExecutor = DefaultCommandExecutor()
+        executor: CommandExecutor = DefaultCommandExecutor(),
     ): RunResult {
         val projectRoot = options.projectDir
         val strategy = options.strategy
         val formatJson = options.formatJson
         val rbsEnabled = settings.useRbs
         val useRbs = rbsEnabled && gemfileHasRbs("$projectRoot/Gemfile")
-        val args = if (options.subcommand != null) {
-            listOf(options.subcommand, projectRoot)
-        } else {
-            getCommandArgs(strategy, formatJson, useRbs, options.file, settings.omitBoilerplate)
-        }
+        val args =
+            if (options.subcommand != null) {
+                listOf(options.subcommand, projectRoot)
+            } else {
+                getCommandArgs(strategy, formatJson, useRbs, options.file, settings.omitBoilerplate)
+            }
         val useBundleExec = settings.useBundleExec
         val commandPath = settings.commandPath
         return if (useBundleExec) {
