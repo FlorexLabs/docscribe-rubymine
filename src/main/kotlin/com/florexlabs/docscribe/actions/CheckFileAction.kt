@@ -1,8 +1,8 @@
 package com.florexlabs.docscribe.actions
 
 import com.florexlabs.docscribe.runner.DocscribeRunner
-import com.florexlabs.docscribe.runner.RunOptions
 import com.florexlabs.docscribe.runner.DocscribeStrategy
+import com.florexlabs.docscribe.runner.RunOptions
 import com.intellij.notification.NotificationGroupManager
 import com.intellij.notification.NotificationType
 import com.intellij.openapi.actionSystem.ActionUpdateThread
@@ -15,16 +15,18 @@ class CheckFileAction : AnAction() {
     override fun actionPerformed(e: AnActionEvent) {
         val project = e.project ?: return
         val vFile = e.getData(CommonDataKeys.VIRTUAL_FILE) ?: return
-        val projectRoot = DocscribeRunner.findProjectRoot(vFile.path) ?: run {
-            showError(project, "No Gemfile found in project tree")
-            return
-        }
-        val options = RunOptions(
-            projectDir = projectRoot,
-            file = vFile.path,
-            strategy = DocscribeStrategy.CHECK,
-            formatJson = true
-        )
+        val projectRoot =
+            DocscribeRunner.findProjectRoot(vFile.path) ?: run {
+                showError(project, "No Gemfile found in project tree")
+                return
+            }
+        val options =
+            RunOptions(
+                projectDir = projectRoot,
+                file = vFile.path,
+                strategy = DocscribeStrategy.CHECK,
+                formatJson = true,
+            )
         val result = DocscribeRunner.runDocscribe(options)
         if (result.exitCode >= 2) {
             showError(project, "DocScribe: error running docscribe")
@@ -42,7 +44,9 @@ class CheckFileAction : AnAction() {
     override fun getActionUpdateThread() = ActionUpdateThread.BGT
 
     private fun buildSummary(result: com.florexlabs.docscribe.runner.RunResult): String {
-        val parsed = com.florexlabs.docscribe.runner.DocscribeOutputParser.parseJson(result.stdout)
+        val parsed =
+            com.florexlabs.docscribe.runner.DocscribeOutputParser
+                .parseJson(result.stdout)
         if (parsed != null) {
             val s = parsed.summary
             if (s != null) {
@@ -55,12 +59,19 @@ class CheckFileAction : AnAction() {
         return if (result.hasIssues) "DocScribe: issues found" else "DocScribe: OK"
     }
 
-    private fun notify(project: com.intellij.openapi.project.Project, content: String, type: NotificationType) {
+    private fun notify(
+        project: com.intellij.openapi.project.Project,
+        content: String,
+        type: NotificationType,
+    ) {
         val group = NotificationGroupManager.getInstance().getNotificationGroup("DocScribe")
         group.createNotification(content, type).notify(project)
     }
 
-    private fun showError(project: com.intellij.openapi.project.Project, message: String) {
+    private fun showError(
+        project: com.intellij.openapi.project.Project,
+        message: String,
+    ) {
         notify(project, message, NotificationType.ERROR)
     }
 }

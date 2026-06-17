@@ -8,7 +8,7 @@ data class OffenseLocation(
     @SerializedName("start_line") val startLine: Int,
     @SerializedName("start_column") val startColumn: Int,
     @SerializedName("last_line") val lastLine: Int,
-    @SerializedName("last_column") val lastColumn: Int
+    @SerializedName("last_column") val lastColumn: Int,
 )
 
 data class ParsedOffense(
@@ -17,25 +17,25 @@ data class ParsedOffense(
     val message: String,
     val corrected: Boolean,
     val correctable: Boolean,
-    val location: OffenseLocation
+    val location: OffenseLocation,
 )
 
 data class ParsedFile(
     val path: String,
-    val offenses: List<ParsedOffense>
+    val offenses: List<ParsedOffense>,
 )
 
 data class ParsedSummary(
     @SerializedName("offense_count") val offenseCount: Int,
     @SerializedName("target_file_count") val targetFileCount: Int,
     @SerializedName("inspected_file_count") val inspectedFileCount: Int,
-    @SerializedName("error_count") val errorCount: Int
+    @SerializedName("error_count") val errorCount: Int,
 )
 
 data class DocscribeOutput(
     val metadata: Map<String, String>?,
     val files: List<ParsedFile>,
-    val summary: ParsedSummary?
+    val summary: ParsedSummary?,
 )
 
 data class TextSummary(
@@ -45,57 +45,63 @@ data class TextSummary(
     val typeMismatchCount: Int = 0,
     val errorCount: Int = 0,
     val okCount: Int = 0,
-    val updatedCount: Int = 0
+    val updatedCount: Int = 0,
 )
 
 object DocscribeOutputParser {
-
     private val gson = Gson()
 
-    private val okRegex = Regex(
-        """Docscribe: OK \((\d+) files checked(?:, (\d+) with type mismatches)?"""
-    )
-    private val failedRegex = Regex(
-        """Docscribe: FAILED \((\d+) need updates, (\d+) type mismatches, (\d+) errors, (\d+) ok\)"""
-    )
-    private val updatedRegex = Regex(
-        """Docscribe: updated (\d+) file\(s\)"""
-    )
-    private val wouldUpdateRegex = Regex(
-        """Would update: (.+)"""
-    )
-    private val changeDetailRegex = Regex(
-        """\s*-\s+(.+)"""
-    )
-    private val typeMismatchRegex = Regex(
-        """Type mismatches: (.+)"""
-    )
-    private val errorProcessingRegex = Regex(
-        """Error processing: (.+)"""
-    )
+    private val okRegex =
+        Regex(
+            """Docscribe: OK \((\d+) files checked(?:, (\d+) with type mismatches)?""",
+        )
+    private val failedRegex =
+        Regex(
+            """Docscribe: FAILED \((\d+) need updates, (\d+) type mismatches, (\d+) errors, (\d+) ok\)""",
+        )
+    private val updatedRegex =
+        Regex(
+            """Docscribe: updated (\d+) file\(s\)""",
+        )
+    private val wouldUpdateRegex =
+        Regex(
+            """Would update: (.+)""",
+        )
+    private val changeDetailRegex =
+        Regex(
+            """\s*-\s+(.+)""",
+        )
+    private val typeMismatchRegex =
+        Regex(
+            """Type mismatches: (.+)""",
+        )
+    private val errorProcessingRegex =
+        Regex(
+            """Error processing: (.+)""",
+        )
 
-    fun parseJson(jsonString: String): DocscribeOutput? {
-        return try {
+    fun parseJson(jsonString: String): DocscribeOutput? =
+        try {
             val type = object : TypeToken<DocscribeOutput>() {}.type
             gson.fromJson<DocscribeOutput>(jsonString, type)
         } catch (_: Exception) {
             null
         }
-    }
 
     data class TextParseResult(
         val summary: TextSummary,
         val wouldUpdateFiles: List<Pair<String, List<String>>> = emptyList(),
         val typeMismatchFiles: List<String> = emptyList(),
-        val errorFiles: List<String> = emptyList()
+        val errorFiles: List<String> = emptyList(),
     )
 
     fun parseTextOutput(text: String): TextParseResult? {
         val lines = text.lines()
         if (lines.isEmpty()) return null
 
-        val summaryLine = lines.find { it.startsWith("Docscribe:") }
-            ?: return null
+        val summaryLine =
+            lines.find { it.startsWith("Docscribe:") }
+                ?: return null
 
         val summary = parseSummaryLine(summaryLine) ?: return null
 
@@ -115,16 +121,19 @@ object DocscribeOutputParser {
                     }
                     currentWouldUpdate = wouldUpdateRegex.find(line)?.groupValues?.getOrNull(1)
                 }
+
                 changeDetailRegex.matches(line) -> {
                     val detail = changeDetailRegex.find(line)?.groupValues?.getOrNull(1)
                     if (detail != null && currentWouldUpdate != null) {
                         currentDetails.add(detail)
                     }
                 }
+
                 line.startsWith("Type mismatches:") -> {
                     val file = typeMismatchRegex.find(line)?.groupValues?.getOrNull(1)
                     if (file != null) typeMismatchFiles.add(file)
                 }
+
                 line.startsWith("Error processing:") -> {
                     val file = errorProcessingRegex.find(line)?.groupValues?.getOrNull(1)
                     if (file != null) errorFiles.add(file)
@@ -145,7 +154,7 @@ object DocscribeOutputParser {
             return TextSummary(
                 status = "OK",
                 inspectedCount = inspected,
-                typeMismatchCount = typeMismatches
+                typeMismatchCount = typeMismatches,
             )
         }
         failedRegex.find(line)?.let { m ->
@@ -155,16 +164,17 @@ object DocscribeOutputParser {
                 typeMismatchCount = m.groupValues[2].toIntOrNull() ?: 0,
                 errorCount = m.groupValues[3].toIntOrNull() ?: 0,
                 okCount = m.groupValues[4].toIntOrNull() ?: 0,
-                inspectedCount = (m.groupValues[1].toIntOrNull() ?: 0) +
-                    (m.groupValues[2].toIntOrNull() ?: 0) +
-                    (m.groupValues[3].toIntOrNull() ?: 0) +
-                    (m.groupValues[4].toIntOrNull() ?: 0)
+                inspectedCount =
+                    (m.groupValues[1].toIntOrNull() ?: 0) +
+                        (m.groupValues[2].toIntOrNull() ?: 0) +
+                        (m.groupValues[3].toIntOrNull() ?: 0) +
+                        (m.groupValues[4].toIntOrNull() ?: 0),
             )
         }
         updatedRegex.find(line)?.let { m ->
             return TextSummary(
                 status = "UPDATED",
-                updatedCount = m.groupValues[1].toIntOrNull() ?: 0
+                updatedCount = m.groupValues[1].toIntOrNull() ?: 0,
             )
         }
         return null

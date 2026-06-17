@@ -9,15 +9,16 @@ import com.intellij.openapi.actionSystem.impl.SimpleDataContext
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 
 class CheckFileActionTest : BasePlatformTestCase() {
-
     private val action = CheckFileAction()
 
     fun testActionIsEnabledForRubyFile() {
         val file = myFixture.configureByText("test.rb", "class Foo; end").virtualFile
-        val dataContext = SimpleDataContext.builder()
-            .add(CommonDataKeys.VIRTUAL_FILE, file)
-            .add(CommonDataKeys.PROJECT, myFixture.project)
-            .build()
+        val dataContext =
+            SimpleDataContext
+                .builder()
+                .add(CommonDataKeys.VIRTUAL_FILE, file)
+                .add(CommonDataKeys.PROJECT, myFixture.project)
+                .build()
         val presentation = Presentation()
         val event = AnActionEvent.createEvent(dataContext, presentation, "test", ActionUiKind.NONE, null)
         action.update(event)
@@ -26,10 +27,12 @@ class CheckFileActionTest : BasePlatformTestCase() {
 
     fun testActionIsDisabledForNonRubyFile() {
         val file = myFixture.configureByText("foo.txt", "plain text").virtualFile
-        val dataContext = SimpleDataContext.builder()
-            .add(CommonDataKeys.VIRTUAL_FILE, file)
-            .add(CommonDataKeys.PROJECT, myFixture.project)
-            .build()
+        val dataContext =
+            SimpleDataContext
+                .builder()
+                .add(CommonDataKeys.VIRTUAL_FILE, file)
+                .add(CommonDataKeys.PROJECT, myFixture.project)
+                .build()
         val presentation = Presentation()
         val event = AnActionEvent.createEvent(dataContext, presentation, "test", ActionUiKind.NONE, null)
         action.update(event)
@@ -37,9 +40,11 @@ class CheckFileActionTest : BasePlatformTestCase() {
     }
 
     fun testActionIsDisabledWithoutFile() {
-        val dataContext = SimpleDataContext.builder()
-            .add(CommonDataKeys.PROJECT, myFixture.project)
-            .build()
+        val dataContext =
+            SimpleDataContext
+                .builder()
+                .add(CommonDataKeys.PROJECT, myFixture.project)
+                .build()
         val presentation = Presentation()
         val event = AnActionEvent.createEvent(dataContext, presentation, "test", ActionUiKind.NONE, null)
         action.update(event)

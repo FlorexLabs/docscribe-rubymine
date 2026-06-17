@@ -8,7 +8,6 @@ import org.junit.rules.TemporaryFolder
 import java.io.File
 
 class GemfileHasRbsTest {
-
     @Rule @JvmField
     val tempDir = TemporaryFolder()
 
@@ -19,7 +18,7 @@ class GemfileHasRbsTest {
             """
             source "https://rubygems.org"
             gem "rbs"
-            """.trimIndent()
+            """.trimIndent(),
         )
         assertTrue(DocscribeRunner.gemfileHasRbs(gemfile.absolutePath))
     }
@@ -31,7 +30,7 @@ class GemfileHasRbsTest {
             """
             source 'https://rubygems.org'
             gem 'rbs'
-            """.trimIndent()
+            """.trimIndent(),
         )
         assertTrue(DocscribeRunner.gemfileHasRbs(gemfile.absolutePath))
     }
@@ -43,7 +42,7 @@ class GemfileHasRbsTest {
             """
             source "https://rubygems.org"
             gem "rspec"
-            """.trimIndent()
+            """.trimIndent(),
         )
         assertFalse(DocscribeRunner.gemfileHasRbs(gemfile.absolutePath))
     }

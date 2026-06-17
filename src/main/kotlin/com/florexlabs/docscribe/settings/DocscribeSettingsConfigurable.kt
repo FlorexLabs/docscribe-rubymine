@@ -9,9 +9,13 @@ import javax.swing.JPanel
 
 class DocscribeSettingsConfigurable : Configurable {
     @JvmField var commandPathField = JBTextField()
+
     @JvmField var useBundleExecCheckBox = JBCheckBox("Use bundle exec")
+
     @JvmField var useRbsCheckBox = JBCheckBox("Use RBS type signatures")
+
     @JvmField var runOnSaveCheckBox = JBCheckBox("Run on save")
+
     @JvmField var omitBoilerplateCheckBox = JBCheckBox("Omit boilerplate text")
     private var panel: JPanel? = null
 
@@ -24,24 +28,26 @@ class DocscribeSettingsConfigurable : Configurable {
         useRbsCheckBox.isSelected = settings.useRbs
         runOnSaveCheckBox.isSelected = settings.runOnSave
         omitBoilerplateCheckBox.isSelected = settings.omitBoilerplate
-        panel = FormBuilder.createFormBuilder()
-            .addLabeledComponent("Command path:", commandPathField)
-            .addComponent(useBundleExecCheckBox)
-            .addComponent(useRbsCheckBox)
-            .addComponent(omitBoilerplateCheckBox)
-            .addComponent(runOnSaveCheckBox)
-            .addComponentFillVertically(JPanel(), 0)
-            .panel
+        panel =
+            FormBuilder
+                .createFormBuilder()
+                .addLabeledComponent("Command path:", commandPathField)
+                .addComponent(useBundleExecCheckBox)
+                .addComponent(useRbsCheckBox)
+                .addComponent(omitBoilerplateCheckBox)
+                .addComponent(runOnSaveCheckBox)
+                .addComponentFillVertically(JPanel(), 0)
+                .panel
         return panel!!
     }
 
     override fun isModified(): Boolean {
         val s = DocscribeSettings.getInstance()
-        return commandPathField.text != s.commandPath
-            || useBundleExecCheckBox.isSelected != s.useBundleExec
-            || useRbsCheckBox.isSelected != s.useRbs
-            || omitBoilerplateCheckBox.isSelected != s.omitBoilerplate
-            || runOnSaveCheckBox.isSelected != s.runOnSave
+        return commandPathField.text != s.commandPath ||
+            useBundleExecCheckBox.isSelected != s.useBundleExec ||
+            useRbsCheckBox.isSelected != s.useRbs ||
+            omitBoilerplateCheckBox.isSelected != s.omitBoilerplate ||
+            runOnSaveCheckBox.isSelected != s.runOnSave
     }
 
     override fun apply() {

@@ -14,16 +14,18 @@ class SafeFixAction : AnAction() {
     override fun actionPerformed(e: AnActionEvent) {
         val project = e.project ?: return
         val vFile = e.getData(CommonDataKeys.VIRTUAL_FILE) ?: return
-        val projectRoot = DocscribeRunner.findProjectRoot(vFile.path) ?: run {
-            notify(project, "No Gemfile found in project tree", NotificationType.ERROR)
-            return
-        }
-        val options = RunOptions(
-            projectDir = projectRoot,
-            file = vFile.path,
-            strategy = DocscribeStrategy.SAFE,
-            formatJson = false
-        )
+        val projectRoot =
+            DocscribeRunner.findProjectRoot(vFile.path) ?: run {
+                notify(project, "No Gemfile found in project tree", NotificationType.ERROR)
+                return
+            }
+        val options =
+            RunOptions(
+                projectDir = projectRoot,
+                file = vFile.path,
+                strategy = DocscribeStrategy.SAFE,
+                formatJson = false,
+            )
         val result = DocscribeRunner.runDocscribe(options)
         if (result.exitCode >= 2) {
             notify(project, "DocScribe: error applying safe fix", NotificationType.ERROR)
@@ -39,7 +41,11 @@ class SafeFixAction : AnAction() {
 
     override fun getActionUpdateThread() = ActionUpdateThread.BGT
 
-    private fun notify(project: com.intellij.openapi.project.Project, content: String, type: NotificationType) {
+    private fun notify(
+        project: com.intellij.openapi.project.Project,
+        content: String,
+        type: NotificationType,
+    ) {
         val group = NotificationGroupManager.getInstance().getNotificationGroup("DocScribe")
         group.createNotification(content, type).notify(project)
     }

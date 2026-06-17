@@ -19,10 +19,11 @@ class CheckWorkspaceAction : AnAction() {
     override fun actionPerformed(e: AnActionEvent) {
         val project = e.project ?: return
         val projectDir = project.basePath ?: return
-        val projectRoot = DocscribeRunner.findProjectRoot(projectDir) ?: run {
-            notify(project, "No Gemfile found in project tree", NotificationType.ERROR)
-            return
-        }
+        val projectRoot =
+            DocscribeRunner.findProjectRoot(projectDir) ?: run {
+                notify(project, "No Gemfile found in project tree", NotificationType.ERROR)
+                return
+            }
 
         object : Task.Backgroundable(project, "DocScribe: checking workspace...", false) {
             var totalIssues = 0
@@ -30,11 +31,12 @@ class CheckWorkspaceAction : AnAction() {
             var fileCount = 0
 
             override fun run(indicator: ProgressIndicator) {
-                val options = RunOptions(
-                    projectDir = projectRoot,
-                    strategy = DocscribeStrategy.CHECK,
-                    formatJson = true
-                )
+                val options =
+                    RunOptions(
+                        projectDir = projectRoot,
+                        strategy = DocscribeStrategy.CHECK,
+                        formatJson = true,
+                    )
                 val result = DocscribeRunner.runDocscribe(options)
                 if (result.exitCode >= 2) {
                     notify(project, "DocScribe: error running docscribe", NotificationType.ERROR)
@@ -67,7 +69,11 @@ class CheckWorkspaceAction : AnAction() {
 
     override fun getActionUpdateThread() = ActionUpdateThread.BGT
 
-    private fun notify(project: com.intellij.openapi.project.Project, content: String, type: NotificationType) {
+    private fun notify(
+        project: com.intellij.openapi.project.Project,
+        content: String,
+        type: NotificationType,
+    ) {
         val group = NotificationGroupManager.getInstance().getNotificationGroup("DocScribe")
         group.createNotification(content, type).notify(project)
     }
