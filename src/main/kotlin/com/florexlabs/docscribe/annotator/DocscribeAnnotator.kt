@@ -26,12 +26,13 @@ class DocscribeAnnotator : ExternalAnnotator<AnnotatorFileInfo, com.florexlabs.d
 
     override fun doAnnotate(info: AnnotatorFileInfo): com.florexlabs.docscribe.runner.DocscribeOutput? {
         val projectRoot = DocscribeRunner.findProjectRoot(info.filePath) ?: return null
-        val options = RunOptions(
-            projectDir = projectRoot,
-            file = info.filePath,
-            strategy = DocscribeStrategy.CHECK,
-            formatJson = true,
-        )
+        val options =
+            RunOptions(
+                projectDir = projectRoot,
+                file = info.filePath,
+                strategy = DocscribeStrategy.CHECK,
+                formatJson = true,
+            )
         val result = DocscribeRunner.runDocscribe(options)
         if (!result.success || result.stdout.isBlank()) return null
         return DocscribeOutputParser.parseJson(result.stdout)
@@ -50,12 +51,17 @@ class DocscribeAnnotator : ExternalAnnotator<AnnotatorFileInfo, com.florexlabs.d
                 val lineStart = document.getLineStartOffset(line)
                 val lineEnd = document.getLineEndOffset(line)
                 val range = TextRange(lineStart, lineEnd)
-                val severity = if (offense.severity == "fatal") {
-                    HighlightSeverity.ERROR
-                } else {
-                    HighlightSeverity.WARNING
-                }
-                holder.newAnnotation(severity, offense.message).range(range).withFix(DocscribeFixIntention()).create()
+                val severity =
+                    if (offense.severity == "fatal") {
+                        HighlightSeverity.ERROR
+                    } else {
+                        HighlightSeverity.WARNING
+                    }
+                holder
+                    .newAnnotation(severity, offense.message)
+                    .range(range)
+                    .withFix(DocscribeFixIntention())
+                    .create()
             }
         }
     }
