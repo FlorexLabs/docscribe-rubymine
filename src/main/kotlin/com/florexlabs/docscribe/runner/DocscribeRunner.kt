@@ -40,7 +40,7 @@ class DefaultCommandExecutor : CommandExecutor {
         val output = handler.runProcess()
         val exitCode = output.exitCode
         return RunResult(
-            success = exitCode < 2,
+            success = exitCode != 2,
             hasIssues = exitCode == 1,
             exitCode = exitCode,
             stdout = output.stdout,
