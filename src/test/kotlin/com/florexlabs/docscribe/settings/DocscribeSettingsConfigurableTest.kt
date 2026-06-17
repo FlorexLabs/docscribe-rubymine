@@ -42,11 +42,14 @@ class DocscribeSettingsConfigurableTest : BasePlatformTestCase() {
         c.createComponent()
         c.commandPathField.text = "/custom/docscribe"
         c.useBundleExecCheckBox.isSelected = true
+        c.omitBoilerplateCheckBox.isSelected = false
         c.apply()
         assertEquals("/custom/docscribe", s.commandPath)
         assertTrue(s.useBundleExec)
+        assertFalse(s.omitBoilerplate)
         s.commandPath = originalPath
         s.useBundleExec = false
+        s.omitBoilerplate = true
     }
 
     fun testResetRestoresFromSettings() {

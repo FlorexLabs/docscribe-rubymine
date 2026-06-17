@@ -12,6 +12,7 @@ class DocscribeSettingsConfigurable : Configurable {
     @JvmField var useBundleExecCheckBox = JBCheckBox("Use bundle exec")
     @JvmField var useRbsCheckBox = JBCheckBox("Use RBS type signatures")
     @JvmField var runOnSaveCheckBox = JBCheckBox("Run on save")
+    @JvmField var omitBoilerplateCheckBox = JBCheckBox("Omit boilerplate text")
     private var panel: JPanel? = null
 
     override fun getDisplayName(): String = "DocScribe"
@@ -22,10 +23,12 @@ class DocscribeSettingsConfigurable : Configurable {
         useBundleExecCheckBox.isSelected = settings.useBundleExec
         useRbsCheckBox.isSelected = settings.useRbs
         runOnSaveCheckBox.isSelected = settings.runOnSave
+        omitBoilerplateCheckBox.isSelected = settings.omitBoilerplate
         panel = FormBuilder.createFormBuilder()
             .addLabeledComponent("Command path:", commandPathField)
             .addComponent(useBundleExecCheckBox)
             .addComponent(useRbsCheckBox)
+            .addComponent(omitBoilerplateCheckBox)
             .addComponent(runOnSaveCheckBox)
             .addComponentFillVertically(JPanel(), 0)
             .panel
@@ -37,6 +40,7 @@ class DocscribeSettingsConfigurable : Configurable {
         return commandPathField.text != s.commandPath
             || useBundleExecCheckBox.isSelected != s.useBundleExec
             || useRbsCheckBox.isSelected != s.useRbs
+            || omitBoilerplateCheckBox.isSelected != s.omitBoilerplate
             || runOnSaveCheckBox.isSelected != s.runOnSave
     }
 
@@ -45,6 +49,7 @@ class DocscribeSettingsConfigurable : Configurable {
         s.commandPath = commandPathField.text
         s.useBundleExec = useBundleExecCheckBox.isSelected
         s.useRbs = useRbsCheckBox.isSelected
+        s.omitBoilerplate = omitBoilerplateCheckBox.isSelected
         s.runOnSave = runOnSaveCheckBox.isSelected
     }
 
@@ -53,6 +58,7 @@ class DocscribeSettingsConfigurable : Configurable {
         commandPathField.text = s.commandPath
         useBundleExecCheckBox.isSelected = s.useBundleExec
         useRbsCheckBox.isSelected = s.useRbs
+        omitBoilerplateCheckBox.isSelected = s.omitBoilerplate
         runOnSaveCheckBox.isSelected = s.runOnSave
     }
 }

@@ -13,7 +13,8 @@ data class RunOptions(
     val projectDir: String,
     val file: String? = null,
     val strategy: DocscribeStrategy = DocscribeStrategy.CHECK,
-    val formatJson: Boolean = true
+    val formatJson: Boolean = true,
+    val subcommand: String? = null
 )
 
 data class RunResult(
@@ -40,7 +41,7 @@ class DefaultCommandExecutor : CommandExecutor {
         val output = handler.runProcess()
         val exitCode = output.exitCode
         return RunResult(
-            success = exitCode < 2,
+            success = exitCode != 2,
             hasIssues = exitCode == 1,
             exitCode = exitCode,
             stdout = output.stdout,
@@ -74,12 +75,19 @@ object DocscribeRunner {
         strategy: DocscribeStrategy,
         formatJson: Boolean,
         useRbs: Boolean,
-        filePath: String? = null
+        filePath: String? = null,
+        omitBoilerplate: Boolean = false
     ): List<String> {
         val args = mutableListOf<String>()
         when (strategy) {
-            DocscribeStrategy.SAFE -> args.add("-a")
-            DocscribeStrategy.AGGRESSIVE -> args.add("-A")
+            DocscribeStrategy.SAFE -> {
+                args.add("-a")
+                if (omitBoilerplate) args.add("-B")
+            }
+            DocscribeStrategy.AGGRESSIVE -> {
+                args.addAll(listOf("-A", "-k"))
+                if (omitBoilerplate) args.add("-B")
+            }
             DocscribeStrategy.CHECK -> {}
         }
         if (formatJson && strategy == DocscribeStrategy.CHECK) {
@@ -105,7 +113,11 @@ object DocscribeRunner {
         val formatJson = options.formatJson
         val rbsEnabled = settings.useRbs
         val useRbs = rbsEnabled && gemfileHasRbs("$projectRoot/Gemfile")
-        val args = getCommandArgs(strategy, formatJson, useRbs, options.file)
+        val args = if (options.subcommand != null) {
+            listOf(options.subcommand, projectRoot)
+        } else {
+            getCommandArgs(strategy, formatJson, useRbs, options.file, settings.omitBoilerplate)
+        }
         val useBundleExec = settings.useBundleExec
         val commandPath = settings.commandPath
         return if (useBundleExec) {
