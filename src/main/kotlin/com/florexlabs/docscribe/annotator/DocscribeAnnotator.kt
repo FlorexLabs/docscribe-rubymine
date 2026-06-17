@@ -1,5 +1,6 @@
 package com.florexlabs.docscribe.annotator
 
+import com.florexlabs.docscribe.runner.DocscribeOutput
 import com.florexlabs.docscribe.runner.DocscribeOutputParser
 import com.florexlabs.docscribe.runner.DocscribeRunner
 import com.florexlabs.docscribe.runner.DocscribeStrategy
@@ -11,12 +12,20 @@ import com.intellij.openapi.util.TextRange
 import com.intellij.psi.PsiDocumentManager
 import com.intellij.psi.PsiFile
 
+/**
+ * Information collected by the annotator before running the background check.
+ */
 data class AnnotatorFileInfo(
     val filePath: String,
     val projectDir: String,
 )
 
-class DocscribeAnnotator : ExternalAnnotator<AnnotatorFileInfo, com.florexlabs.docscribe.runner.DocscribeOutput>() {
+/**
+ * [ExternalAnnotator] that runs docscribe **check** on Ruby files and shows inline diagnostics.
+ *
+ * Triggers automatically when a Ruby file is opened or saved. Uses JSON output for structured parsing.
+ */
+class DocscribeAnnotator : ExternalAnnotator<AnnotatorFileInfo, DocscribeOutput>() {
     override fun collectInformation(file: PsiFile): AnnotatorFileInfo? {
         if (!file.name.endsWith(".rb")) return null
         val vFile = file.virtualFile ?: return null
@@ -24,7 +33,7 @@ class DocscribeAnnotator : ExternalAnnotator<AnnotatorFileInfo, com.florexlabs.d
         return AnnotatorFileInfo(vFile.path, projectDir)
     }
 
-    override fun doAnnotate(info: AnnotatorFileInfo): com.florexlabs.docscribe.runner.DocscribeOutput? {
+    override fun doAnnotate(info: AnnotatorFileInfo): DocscribeOutput? {
         val projectRoot = DocscribeRunner.findProjectRoot(info.filePath) ?: return null
         val options =
             RunOptions(
@@ -40,7 +49,7 @@ class DocscribeAnnotator : ExternalAnnotator<AnnotatorFileInfo, com.florexlabs.d
 
     override fun apply(
         file: PsiFile,
-        annotationResult: com.florexlabs.docscribe.runner.DocscribeOutput?,
+        annotationResult: DocscribeOutput?,
         holder: AnnotationHolder,
     ) {
         if (annotationResult == null) return

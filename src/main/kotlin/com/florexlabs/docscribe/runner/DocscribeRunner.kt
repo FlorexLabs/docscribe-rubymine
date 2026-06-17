@@ -5,12 +5,24 @@ import com.intellij.execution.configurations.GeneralCommandLine
 import com.intellij.execution.process.CapturingProcessHandler
 import java.io.File
 
+/**
+ * The docscribe strategy type: check for diagnostics, or apply safe/aggressive fixes.
+ */
 enum class DocscribeStrategy {
     CHECK,
     SAFE,
     AGGRESSIVE,
 }
 
+/**
+ * Options passed to [DocscribeRunner.runDocscribe].
+ *
+ * @property projectDir  Absolute path to the project root (containing Gemfile).
+ * @property file        Specific Ruby file to check/fix, or `null` for all files.
+ * @property strategy    Which docscribe strategy to use.
+ * @property formatJson  Whether to request JSON output (only used for CHECK).
+ * @property subcommand  Optional subcommand (e.g. `"update_types"`) — when set, [strategy] is ignored.
+ */
 data class RunOptions(
     val projectDir: String,
     val file: String? = null,
@@ -19,6 +31,15 @@ data class RunOptions(
     val subcommand: String? = null,
 )
 
+/**
+ * Result of a docscribe command execution.
+ *
+ * @property success   `true` when exit code is *not* 2 (fatal error).
+ * @property hasIssues `true` when exit code is 1 (findings reported).
+ * @property exitCode  Raw process exit code (0 = OK, 1 = findings, 2 = error).
+ * @property stdout    Standard output text.
+ * @property stderr    Standard error text.
+ */
 data class RunResult(
     val success: Boolean,
     val hasIssues: Boolean,
@@ -30,6 +51,9 @@ data class RunResult(
     val output: String get() = if (stderr.isBlank()) stdout else "$stdout\n$stderr"
 }
 
+/**
+ * Abstraction over process execution for testability.
+ */
 interface CommandExecutor {
     fun execute(
         cmd: String,
@@ -38,6 +62,9 @@ interface CommandExecutor {
     ): RunResult
 }
 
+/**
+ * Default [CommandExecutor] that spawns a real OS process via [GeneralCommandLine].
+ */
 class DefaultCommandExecutor : CommandExecutor {
     override fun execute(
         cmd: String,
@@ -61,9 +88,22 @@ class DefaultCommandExecutor : CommandExecutor {
     }
 }
 
+/**
+ * Entry-point for running the docscribe CLI.
+ *
+ * All public methods are stateless; [findProjectRoot] traverses upward to locate the Gemfile,
+ * [gemfileHasRbs] checks for the `rbs` gem dependency, and [getCommandArgs] builds the argument
+ * list for the given strategy and options.
+ */
 object DocscribeRunner {
     private const val MAX_DEPTH = 20
 
+    /**
+     * Walk up from [startPath] looking for a directory that contains a `Gemfile`.
+     *
+     * @param startPath  Absolute path to start searching from.
+     * @return Absolute path of the directory containing `Gemfile`, or `null` if none found.
+     */
     fun findProjectRoot(startPath: String): String? {
         var current = File(startPath).canonicalFile
         repeat(MAX_DEPTH) {
@@ -74,6 +114,12 @@ object DocscribeRunner {
         return null
     }
 
+    /**
+     * Check whether a Gemfile contains a `gem "rbs"` declaration.
+     *
+     * @param gemfilePath  Absolute path to the Gemfile.
+     * @return `true` if the `rbs` gem is listed.
+     */
     fun gemfileHasRbs(gemfilePath: String): Boolean =
         try {
             val content = File(gemfilePath).readText()
@@ -82,6 +128,15 @@ object DocscribeRunner {
             false
         }
 
+    /**
+     * Build the CLI argument list for the docscribe command.
+     *
+     * @param strategy        Target strategy (CHECK, SAFE, AGGRESSIVE).
+     * @param formatJson      Request JSON output (only effective for CHECK).
+     * @param useRbs          Add `--rbs-collection` flag.
+     * @param filePath        Optional specific file path to scope the operation.
+     * @param omitBoilerplate Add `-B` flag for safe/aggressive modes.
+     */
     fun getCommandArgs(
         strategy: DocscribeStrategy,
         formatJson: Boolean,
@@ -115,6 +170,13 @@ object DocscribeRunner {
         return args
     }
 
+    /**
+     * Execute docscribe with the given options.
+     *
+     * @param options   Run configuration (strategy, file, etc.).
+     * @param settings  Settings object (retrieved via singleton by default).
+     * @param executor  Process executor (defaults to real OS process).
+     */
     @Suppress("unused")
     fun runDocscribe(
         options: RunOptions,

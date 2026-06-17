@@ -10,7 +10,13 @@ import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.CommonDataKeys
 import com.intellij.openapi.progress.ProgressIndicator
 import com.intellij.openapi.progress.Task
+import com.intellij.openapi.project.Project
 
+/**
+ * Run `docscribe update_types` to refresh YARD documentation from RBS signatures.
+ *
+ * Only visible when the project's Gemfile contains the `rbs` gem.
+ */
 class UpdateTypesAction : AnAction() {
     override fun actionPerformed(e: AnActionEvent) {
         val project = e.project ?: return
@@ -70,7 +76,7 @@ class UpdateTypesAction : AnAction() {
     override fun getActionUpdateThread() = ActionUpdateThread.BGT
 
     private fun notify(
-        project: com.intellij.openapi.project.Project,
+        project: Project,
         content: String,
         type: NotificationType,
     ) {

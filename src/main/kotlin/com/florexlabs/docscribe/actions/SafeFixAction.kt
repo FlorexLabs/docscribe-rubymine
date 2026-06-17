@@ -9,7 +9,11 @@ import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.CommonDataKeys
+import com.intellij.openapi.project.Project
 
+/**
+ * Apply docscribe **safe** fixes (add missing YARD tags) to the current Ruby file.
+ */
 class SafeFixAction : AnAction() {
     override fun actionPerformed(e: AnActionEvent) {
         val project = e.project ?: return
@@ -42,7 +46,7 @@ class SafeFixAction : AnAction() {
     override fun getActionUpdateThread() = ActionUpdateThread.BGT
 
     private fun notify(
-        project: com.intellij.openapi.project.Project,
+        project: Project,
         content: String,
         type: NotificationType,
     ) {

@@ -37,6 +37,9 @@
                 displayName="DocScribe"
                 id="com.florexlabs.docscribe.settings"
                 instance="com.florexlabs.docscribe.settings.DocscribeSettingsConfigurable"/>
+
+        <lang.foldingBuilder language="Ruby"
+                implementationClass="com.florexlabs.docscribe.folding.YardFoldingBuilder"/>
     </extensions>
 
     <actions>

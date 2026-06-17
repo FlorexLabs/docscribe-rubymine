@@ -6,6 +6,7 @@ plugins {
     id("org.jetbrains.intellij.platform") version "2.16.0"
     id("com.diffplug.spotless") version "8.6.0"
     id("dev.detekt") version "2.0.0-alpha.4"
+    id("org.jetbrains.dokka") version "2.0.0"
 }
 
 group = "com.florexlabs"

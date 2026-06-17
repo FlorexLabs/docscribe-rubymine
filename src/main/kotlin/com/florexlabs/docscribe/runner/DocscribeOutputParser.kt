@@ -4,6 +4,9 @@ import com.google.gson.Gson
 import com.google.gson.annotations.SerializedName
 import com.google.gson.reflect.TypeToken
 
+/**
+ * Location range of a single offense within a source file.
+ */
 data class OffenseLocation(
     @SerializedName("start_line") val startLine: Int,
     @SerializedName("start_column") val startColumn: Int,
@@ -11,6 +14,9 @@ data class OffenseLocation(
     @SerializedName("last_column") val lastColumn: Int,
 )
 
+/**
+ * A single diagnostic finding from docscribe.
+ */
 data class ParsedOffense(
     val severity: String,
     @SerializedName("cop_name") val copName: String,
@@ -20,11 +26,17 @@ data class ParsedOffense(
     val location: OffenseLocation,
 )
 
+/**
+ * A file with its list of offenses.
+ */
 data class ParsedFile(
     val path: String,
     val offenses: List<ParsedOffense>,
 )
 
+/**
+ * Summary counts from docscribe JSON output.
+ */
 data class ParsedSummary(
     @SerializedName("offense_count") val offenseCount: Int,
     @SerializedName("target_file_count") val targetFileCount: Int,
@@ -32,12 +44,18 @@ data class ParsedSummary(
     @SerializedName("error_count") val errorCount: Int,
 )
 
+/**
+ * Top-level structure of docscribe JSON output.
+ */
 data class DocscribeOutput(
     val metadata: Map<String, String>?,
     val files: List<ParsedFile>,
     val summary: ParsedSummary?,
 )
 
+/**
+ * Parsed summary from docscribe text output.
+ */
 data class TextSummary(
     val status: String,
     val inspectedCount: Int = 0,
@@ -48,6 +66,9 @@ data class TextSummary(
     val updatedCount: Int = 0,
 )
 
+/**
+ * Parses docscribe CLI output (both JSON and text formats).
+ */
 object DocscribeOutputParser {
     private val gson = Gson()
 
@@ -80,6 +101,12 @@ object DocscribeOutputParser {
             """Error processing: (.+)""",
         )
 
+    /**
+     * Parse docscribe JSON output into a structured [DocscribeOutput].
+     *
+     * @param jsonString Raw JSON output from docscribe `--format json`.
+     * @return Parsed output or `null` on malformed JSON.
+     */
     fun parseJson(jsonString: String): DocscribeOutput? =
         try {
             val type = object : TypeToken<DocscribeOutput>() {}.type
@@ -88,6 +115,9 @@ object DocscribeOutputParser {
             null
         }
 
+    /**
+     * Result of parsing docscribe text-mode output.
+     */
     data class TextParseResult(
         val summary: TextSummary,
         val wouldUpdateFiles: List<Pair<String, List<String>>> = emptyList(),
@@ -95,6 +125,15 @@ object DocscribeOutputParser {
         val errorFiles: List<String> = emptyList(),
     )
 
+    /**
+     * Parse docscribe text output (non-JSON mode).
+     *
+     * Extracts the summary line ("Docscribe: OK / FAILED / updated") and lists of
+     * would-update files, type-mismatch files, and error files.
+     *
+     * @param text Raw text output from docscribe.
+     * @return Parsed result or `null` if no summary line is found.
+     */
     fun parseTextOutput(text: String): TextParseResult? {
         val lines = text.lines()
         if (lines.isEmpty()) return null
@@ -147,6 +186,14 @@ object DocscribeOutputParser {
         return TextParseResult(summary, wouldUpdateFiles, typeMismatchFiles, errorFiles)
     }
 
+    /**
+     * Parse a single "Docscribe:" summary line into a [TextSummary].
+     *
+     * Handles three formats:
+     * - OK: `Docscribe: OK (N files checked)`
+     * - FAILED: `Docscribe: FAILED (N need updates, M type mismatches, ...)`
+     * - UPDATED: `Docscribe: updated N file(s)`
+     */
     private fun parseSummaryLine(line: String): TextSummary? {
         okRegex.find(line)?.let { m ->
             val inspected = m.groupValues[1].toIntOrNull() ?: 0
