@@ -7,6 +7,11 @@ import com.intellij.util.ui.FormBuilder
 import javax.swing.JComponent
 import javax.swing.JPanel
 
+/**
+ * Settings UI page for the DocScribe plugin (under **Tools → DocScribe**).
+ *
+ * Binds Swing controls to [DocscribeSettings] fields.
+ */
 class DocscribeSettingsConfigurable : Configurable {
     @JvmField var commandPathField = JBTextField()
 
@@ -17,6 +22,8 @@ class DocscribeSettingsConfigurable : Configurable {
     @JvmField var runOnSaveCheckBox = JBCheckBox("Run on save")
 
     @JvmField var omitBoilerplateCheckBox = JBCheckBox("Omit boilerplate text")
+
+    @JvmField var hideCommentsCheckBox = JBCheckBox("Hide comments by default")
     private var panel: JPanel? = null
 
     override fun getDisplayName(): String = "DocScribe"
@@ -28,6 +35,7 @@ class DocscribeSettingsConfigurable : Configurable {
         useRbsCheckBox.isSelected = settings.useRbs
         runOnSaveCheckBox.isSelected = settings.runOnSave
         omitBoilerplateCheckBox.isSelected = settings.omitBoilerplate
+        hideCommentsCheckBox.isSelected = settings.hideCommentsByDefault
         panel =
             FormBuilder
                 .createFormBuilder()
@@ -35,6 +43,7 @@ class DocscribeSettingsConfigurable : Configurable {
                 .addComponent(useBundleExecCheckBox)
                 .addComponent(useRbsCheckBox)
                 .addComponent(omitBoilerplateCheckBox)
+                .addComponent(hideCommentsCheckBox)
                 .addComponent(runOnSaveCheckBox)
                 .addComponentFillVertically(JPanel(), 0)
                 .panel
@@ -47,6 +56,7 @@ class DocscribeSettingsConfigurable : Configurable {
             useBundleExecCheckBox.isSelected != s.useBundleExec ||
             useRbsCheckBox.isSelected != s.useRbs ||
             omitBoilerplateCheckBox.isSelected != s.omitBoilerplate ||
+            hideCommentsCheckBox.isSelected != s.hideCommentsByDefault ||
             runOnSaveCheckBox.isSelected != s.runOnSave
     }
 
@@ -56,6 +66,7 @@ class DocscribeSettingsConfigurable : Configurable {
         s.useBundleExec = useBundleExecCheckBox.isSelected
         s.useRbs = useRbsCheckBox.isSelected
         s.omitBoilerplate = omitBoilerplateCheckBox.isSelected
+        s.hideCommentsByDefault = hideCommentsCheckBox.isSelected
         s.runOnSave = runOnSaveCheckBox.isSelected
     }
 
@@ -65,6 +76,7 @@ class DocscribeSettingsConfigurable : Configurable {
         useBundleExecCheckBox.isSelected = s.useBundleExec
         useRbsCheckBox.isSelected = s.useRbs
         omitBoilerplateCheckBox.isSelected = s.omitBoilerplate
+        hideCommentsCheckBox.isSelected = s.hideCommentsByDefault
         runOnSaveCheckBox.isSelected = s.runOnSave
     }
 }

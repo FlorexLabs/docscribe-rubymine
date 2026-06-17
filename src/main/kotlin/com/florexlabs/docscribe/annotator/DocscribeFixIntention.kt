@@ -10,6 +10,11 @@ import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.project.Project
 import com.intellij.psi.PsiFile
 
+/**
+ * Quick-fix intention that applies a **safe** docscribe fix to the annotated file.
+ *
+ * Appears as a lightbulb action on inline annotations from [DocscribeAnnotator].
+ */
 class DocscribeFixIntention : IntentionAction {
     override fun getText(): String = "Apply docscribe fix"
 

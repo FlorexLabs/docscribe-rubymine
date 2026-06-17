@@ -12,9 +12,13 @@ import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.CommonDataKeys
 import com.intellij.openapi.progress.ProgressIndicator
 import com.intellij.openapi.progress.Task
-import com.intellij.openapi.roots.ProjectRootManager
-import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.openapi.project.Project
 
+/**
+ * Run docscribe **check** on all Ruby files in the project workspace.
+ *
+ * Runs in background via [Task.Backgroundable]. Shows a summary notification when done.
+ */
 class CheckWorkspaceAction : AnAction() {
     override fun actionPerformed(e: AnActionEvent) {
         val project = e.project ?: return
@@ -70,7 +74,7 @@ class CheckWorkspaceAction : AnAction() {
     override fun getActionUpdateThread() = ActionUpdateThread.BGT
 
     private fun notify(
-        project: com.intellij.openapi.project.Project,
+        project: Project,
         content: String,
         type: NotificationType,
     ) {

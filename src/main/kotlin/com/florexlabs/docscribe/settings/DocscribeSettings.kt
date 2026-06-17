@@ -7,6 +7,11 @@ import com.intellij.openapi.components.State
 import com.intellij.openapi.components.Storage
 import com.intellij.util.xmlb.XmlSerializerUtil
 
+/**
+ * Persistent application-level settings for the DocScribe plugin.
+ *
+ * Stored in `docscribe-settings.xml` under the IDE's config directory.
+ */
 @State(name = "DocscribeSettings", storages = [Storage("docscribe-settings.xml")])
 @Service
 class DocscribeSettings : PersistentStateComponent<DocscribeSettings> {
@@ -15,6 +20,7 @@ class DocscribeSettings : PersistentStateComponent<DocscribeSettings> {
     var runOnSave: Boolean = true
     var useRbs: Boolean = false
     var omitBoilerplate: Boolean = true
+    var hideCommentsByDefault: Boolean = false
 
     override fun getState(): DocscribeSettings = this
 
