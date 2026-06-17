@@ -14,6 +14,7 @@ class DocscribeSettings : PersistentStateComponent<DocscribeSettings> {
     var useBundleExec: Boolean = false
     var runOnSave: Boolean = true
     var useRbs: Boolean = false
+    var omitBoilerplate: Boolean = true
 
     override fun getState(): DocscribeSettings = this
 

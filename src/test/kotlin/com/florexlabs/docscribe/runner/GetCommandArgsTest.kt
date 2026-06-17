@@ -75,7 +75,7 @@ class GetCommandArgsTest {
             formatJson = false,
             useRbs = false
         )
-        assertEquals(listOf("-A"), args)
+        assertEquals(listOf("-A", "-k"), args)
     }
 
     @Test
@@ -86,6 +86,60 @@ class GetCommandArgsTest {
             useRbs = true,
             filePath = "lib/foo.rb"
         )
-        assertEquals(listOf("-A", "--rbs-collection", "lib/foo.rb"), args)
+        assertEquals(listOf("-A", "-k", "--rbs-collection", "lib/foo.rb"), args)
+    }
+
+    @Test
+    fun `aggressive mode adds k flag`() {
+        val args = DocscribeRunner.getCommandArgs(
+            strategy = DocscribeStrategy.AGGRESSIVE,
+            formatJson = false,
+            useRbs = false
+        )
+        assertEquals(listOf("-A", "-k"), args)
+    }
+
+    @Test
+    fun `aggressive mode with boilerplate adds B flag`() {
+        val args = DocscribeRunner.getCommandArgs(
+            strategy = DocscribeStrategy.AGGRESSIVE,
+            formatJson = false,
+            useRbs = false,
+            omitBoilerplate = true
+        )
+        assertEquals(listOf("-A", "-k", "-B"), args)
+    }
+
+    @Test
+    fun `aggressive mode without boilerplate omits B flag`() {
+        val args = DocscribeRunner.getCommandArgs(
+            strategy = DocscribeStrategy.AGGRESSIVE,
+            formatJson = false,
+            useRbs = false,
+            omitBoilerplate = false
+        )
+        assertEquals(listOf("-A", "-k"), args)
+    }
+
+    @Test
+    fun `safe mode with boilerplate adds B flag`() {
+        val args = DocscribeRunner.getCommandArgs(
+            strategy = DocscribeStrategy.SAFE,
+            formatJson = false,
+            useRbs = false,
+            omitBoilerplate = true
+        )
+        assertEquals(listOf("-a", "-B"), args)
+    }
+
+    @Test
+    fun `safe mode without boilerplate omits B flag`() {
+        val args = DocscribeRunner.getCommandArgs(
+            strategy = DocscribeStrategy.SAFE,
+            formatJson = false,
+            useRbs = false,
+            omitBoilerplate = false
+        )
+        assertEquals(listOf("-a"), args)
     }
 }

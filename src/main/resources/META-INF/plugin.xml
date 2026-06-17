@@ -40,20 +40,30 @@
     </extensions>
 
     <actions>
+        <group id="com.florexlabs.docscribe.DocScribeGroup"
+               text="DocScribe" popup="true">
+            <add-to-group group-id="EditorPopupMenu"
+                          anchor="first"/>
+            <reference ref="com.florexlabs.docscribe.CheckFileAction"/>
+            <reference ref="com.florexlabs.docscribe.SafeFixAction"/>
+            <reference ref="com.florexlabs.docscribe.AggressiveFixAction"/>
+            <separator/>
+            <reference ref="com.florexlabs.docscribe.CheckWorkspaceAction"/>
+            <reference ref="com.florexlabs.docscribe.UpdateTypesAction"/>
+        </group>
+
         <action id="com.florexlabs.docscribe.CheckFileAction"
                 class="com.florexlabs.docscribe.actions.CheckFileAction"
-                text="DocScribe: Check Current File"
+                text="Check Current File"
                 description="Run docscribe check on the current Ruby file">
             <keyboard-shortcut keymap="$default"
                                first-keystroke="ctrl shift D"
                                second-keystroke="C"/>
-            <add-to-group group-id="EditorPopupMenu"
-                          anchor="first"/>
         </action>
 
         <action id="com.florexlabs.docscribe.CheckWorkspaceAction"
                 class="com.florexlabs.docscribe.actions.CheckWorkspaceAction"
-                text="DocScribe: Check Entire Workspace"
+                text="Check Entire Workspace"
                 description="Run docscribe check on all Ruby files in the project">
             <keyboard-shortcut keymap="$default"
                                first-keystroke="ctrl shift D"
@@ -62,26 +72,25 @@
 
         <action id="com.florexlabs.docscribe.SafeFixAction"
                 class="com.florexlabs.docscribe.actions.SafeFixAction"
-                text="DocScribe: Apply Safe Fixes"
+                text="Apply Safe Fixes"
                 description="Apply docscribe safe fixes to current file">
             <keyboard-shortcut keymap="$default"
                                first-keystroke="ctrl shift D"
                                second-keystroke="S"/>
-            <add-to-group group-id="EditorPopupMenu"
-                          anchor="after"
-                          relative-to-action="com.florexlabs.docscribe.CheckFileAction"/>
         </action>
 
         <action id="com.florexlabs.docscribe.AggressiveFixAction"
                 class="com.florexlabs.docscribe.actions.AggressiveFixAction"
-                text="DocScribe: Apply Aggressive Fixes"
+                text="Apply Aggressive Fixes"
                 description="Apply docscribe aggressive fixes to current file">
             <keyboard-shortcut keymap="$default"
                                first-keystroke="ctrl shift D"
                                second-keystroke="A"/>
-            <add-to-group group-id="EditorPopupMenu"
-                          anchor="after"
-                          relative-to-action="com.florexlabs.docscribe.SafeFixAction"/>
         </action>
+
+        <action id="com.florexlabs.docscribe.UpdateTypesAction"
+                class="com.florexlabs.docscribe.actions.UpdateTypesAction"
+                text="Update Types from RBS"
+                description="Run docscribe update_types to refresh YARD docs from RBS signatures"/>
     </actions>
 </idea-plugin>
