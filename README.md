@@ -5,11 +5,11 @@
 <h1 align="center">DocScribe for RubyMine</h1>
 
 <p align="center">
-  <a href="https://plugins.jetbrains.com/plugin/XXXXX-docscribe">
-    <img src="https://img.shields.io/jetbrains/plugin/v/XXXXX-docscribe?color=blue&label=Marketplace" alt="JetBrains Marketplace">
+  <a href="https://plugins.jetbrains.com/plugin/32349-docscribe">
+    <img src="https://img.shields.io/jetbrains/plugin/v/32349-docscribe?color=blue&label=Marketplace" alt="JetBrains Marketplace">
   </a>
-  <a href="https://plugins.jetbrains.com/plugin/XXXXX-docscribe">
-    <img src="https://img.shields.io/jetbrains/plugin/d/XXXXX-docscribe?color=green&label=Downloads" alt="Downloads">
+  <a href="https://plugins.jetbrains.com/plugin/32349-docscribe">
+    <img src="https://img.shields.io/jetbrains/plugin/d/32349-docscribe?color=green&label=Downloads" alt="Downloads">
   </a>
   <a href="https://github.com/FlorexLabs/docscribe-rubymine/actions/workflows/ci.yml">
     <img src="https://img.shields.io/github/actions/workflow/status/FlorexLabs/docscribe-rubymine/ci.yml?branch=v0.1.0&label=CI" alt="CI">
@@ -89,7 +89,7 @@ gem "rbs", group: :development
 
 Install directly from the IDE: **Settings -> Plugins -> Marketplace** -> search "DocScribe".
 
-Or download from the [JetBrains Marketplace](https://plugins.jetbrains.com/plugin/XXXXX-docscribe).
+Or download from the [JetBrains Marketplace](https://plugins.jetbrains.com/plugin/32349-docscribe).
 
 ### From disk
 
