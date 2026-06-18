@@ -47,24 +47,24 @@ gem "rbs", group: :development
 
 ### From JetBrains Marketplace
 
-Search for **DocScribe** in Settings → Plugins → Marketplace and install.
+Search for **DocScribe** in Settings -> Plugins -> Marketplace and install.
 
 ### From disk
 
 Download the latest release from [GitHub Releases](https://github.com/FlorexLabs/docscribe-rubymine/releases)
-and install via Settings → Plugins → ⚙ → Install Plugin from Disk.
+and install via Settings -> Plugins -> ⚙ -> Install Plugin from Disk.
 
 ## Usage
 
 ### Actions
 
-| Action                                                | Shortcut                | Description                                            |
-|-------------------------------------------------------|-------------------------|--------------------------------------------------------|
-| **DocScribe → Check Current File**                    | `Ctrl+Shift+D` then `C` | Analyze the active Ruby file for undocumented methods  |
-| **DocScribe → Check Entire Workspace**                | `Ctrl+Shift+D` then `W` | Scan all Ruby files in the project                     |
-| **DocScribe → Apply Safe Fixes**                      | `Ctrl+Shift+D` then `S` | Add docs to undocumented methods only                  |
-| **DocScribe → Apply Aggressive Fixes**                | `Ctrl+Shift+D` then `A` | Replace all existing YARD docs                         |
-| **DocScribe → Update Types from RBS**                 | —                       | Refresh YARD docs from RBS signatures                  |
+| Action                                  | Shortcut                | Description                                           |
+|-----------------------------------------|-------------------------|-------------------------------------------------------|
+| **DocScribe -> Check Current File**     | `Ctrl+Shift+D` then `C` | Analyze the active Ruby file for undocumented methods |
+| **DocScribe -> Check Entire Workspace** | `Ctrl+Shift+D` then `W` | Scan all Ruby files in the project                    |
+| **DocScribe -> Apply Safe Fixes**       | `Ctrl+Shift+D` then `S` | Add docs to undocumented methods only                 |
+| **DocScribe -> Apply Aggressive Fixes** | `Ctrl+Shift+D` then `A` | Replace all existing YARD docs                        |
+| **DocScribe -> Update Types from RBS**  | —                       | Refresh YARD docs from RBS signatures                 |
 
 All actions are available in the editor right-click menu under the **DocScribe** group.
 
@@ -80,7 +80,7 @@ auto-generate documentation for that method.
 
 ### Settings
 
-Navigate to **Settings → Tools → DocScribe**:
+Navigate to **Settings -> Tools -> DocScribe**:
 
 | Setting                    | Description                                            | Default      |
 |----------------------------|--------------------------------------------------------|--------------|
