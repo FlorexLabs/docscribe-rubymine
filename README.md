@@ -29,8 +29,22 @@
 using [docscribe](https://github.com/unurgunite/docscribe) — a Ruby gem that analyzes AST and suggests YARD-compatible
 documentation. Compatible with **docscribe >= 1.5.0**.
 
-> Also available for [VS Code](https://github.com/FlorexLabs/docscribe-vscode) on
+> Also, available for [VS Code](https://github.com/FlorexLabs/docscribe-vscode) on
 > the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=FlorexLabs.docscribe).
+
+* [Features](#features)
+* [Requirements](#requirements)
+* [Installation](#installation)
+  * [From JetBrains Marketplace](#from-jetbrains-marketplace)
+  * [From disk](#from-disk)
+* [Usage](#usage)
+  * [Actions](#actions)
+  * [Diagnostics](#diagnostics)
+  * [Quick-Fix](#quick-fix)
+  * [Settings](#settings)
+* [Development](#development)
+* [Architecture](#architecture)
+* [License](#license)
 
 ## Features
 
