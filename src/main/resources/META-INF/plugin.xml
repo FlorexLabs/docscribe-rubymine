@@ -11,7 +11,11 @@
             <li>Apply safe fixes (add required tags)</li>
             <li>Apply aggressive fixes (add full documentation)</li>
             <li>Inline diagnostics on file open and save</li>
+            <li>Collapsible YARD comment blocks</li>
+            <li>RBS type inference</li>
+            <li>Rake file support</li>
         </ul>
+        <p>Compatible with <strong>docscribe >= 1.5.0</strong>.</p>
     ]]></description>
 
     <change-notes><![CDATA[
@@ -44,7 +48,8 @@
 
     <actions>
         <group id="com.florexlabs.docscribe.DocScribeGroup"
-               text="DocScribe" popup="true">
+               text="DocScribe" popup="true"
+               icon="/com/florexlabs/docscribe/icons/docscribe.svg">
             <add-to-group group-id="EditorPopupMenu"
                           anchor="first"/>
             <reference ref="com.florexlabs.docscribe.CheckFileAction"/>
