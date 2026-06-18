@@ -8,7 +8,7 @@ import javax.swing.JComponent
 import javax.swing.JPanel
 
 /**
- * Settings UI page for the DocScribe plugin (under **Tools → DocScribe**).
+ * Settings UI page for the DocScribe plugin (under **Tools -> DocScribe**).
  *
  * Binds Swing controls to [DocscribeSettings] fields.
  */
