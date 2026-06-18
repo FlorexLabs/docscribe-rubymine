@@ -1,10 +1,50 @@
-# DocScribe for RubyMine
+<p align="center">
+  <img src="src/main/resources/META-INF/pluginIcon_256x256.png" alt="DocScribe Logo" width="128">
+</p>
+
+<h1 align="center">DocScribe for RubyMine</h1>
+
+<p align="center">
+  <a href="https://plugins.jetbrains.com/plugin/XXXXX-docscribe">
+    <img src="https://img.shields.io/jetbrains/plugin/v/XXXXX-docscribe?color=blue&label=Marketplace" alt="JetBrains Marketplace">
+  </a>
+  <a href="https://plugins.jetbrains.com/plugin/XXXXX-docscribe">
+    <img src="https://img.shields.io/jetbrains/plugin/d/XXXXX-docscribe?color=green&label=Downloads" alt="Downloads">
+  </a>
+  <a href="https://github.com/FlorexLabs/docscribe-rubymine/actions/workflows/ci.yml">
+    <img src="https://img.shields.io/github/actions/workflow/status/FlorexLabs/docscribe-rubymine/ci.yml?branch=v0.1.0&label=CI" alt="CI">
+  </a>
+  <a href="LICENSE">
+    <img src="https://img.shields.io/github/license/FlorexLabs/docscribe-rubymine" alt="License">
+  </a>
+  <a href="#requirements">
+    <img src="https://img.shields.io/badge/RubyMine-2026.1%2B-blue" alt="RubyMine">
+  </a>
+  <a href="#requirements">
+    <img src="https://img.shields.io/badge/ruby-%3E%3D%202.7-red" alt="Ruby">
+  </a>
+</p>
 
 **DocScribe** is a RubyMine plugin that auto-generates inline YARD documentation for Ruby methods
 using [docscribe](https://github.com/unurgunite/docscribe) — a Ruby gem that analyzes AST and suggests YARD-compatible
 documentation. Compatible with **docscribe >= 1.5.0**.
 
-> Also available for [VS Code](https://github.com/FlorexLabs/docscribe-vscode).
+> Also, available for [VS Code](https://github.com/FlorexLabs/docscribe-vscode) on
+> the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=FlorexLabs.docscribe).
+
+* [Features](#features)
+* [Requirements](#requirements)
+* [Installation](#installation)
+  * [From JetBrains Marketplace](#from-jetbrains-marketplace)
+  * [From disk](#from-disk)
+* [Usage](#usage)
+  * [Actions](#actions)
+  * [Diagnostics](#diagnostics)
+  * [Quick-Fix](#quick-fix)
+  * [Settings](#settings)
+* [Development](#development)
+* [Architecture](#architecture)
+* [License](#license)
 
 ## Features
 
@@ -47,24 +87,26 @@ gem "rbs", group: :development
 
 ### From JetBrains Marketplace
 
-Search for **DocScribe** in Settings → Plugins → Marketplace and install.
+Install directly from the IDE: **Settings -> Plugins -> Marketplace** -> search "DocScribe".
+
+Or download from the [JetBrains Marketplace](https://plugins.jetbrains.com/plugin/XXXXX-docscribe).
 
 ### From disk
 
 Download the latest release from [GitHub Releases](https://github.com/FlorexLabs/docscribe-rubymine/releases)
-and install via Settings → Plugins → ⚙ → Install Plugin from Disk.
+and install via Settings -> Plugins -> ⚙ -> Install Plugin from Disk.
 
 ## Usage
 
 ### Actions
 
-| Action                                                | Shortcut                | Description                                            |
-|-------------------------------------------------------|-------------------------|--------------------------------------------------------|
-| **DocScribe → Check Current File**                    | `Ctrl+Shift+D` then `C` | Analyze the active Ruby file for undocumented methods  |
-| **DocScribe → Check Entire Workspace**                | `Ctrl+Shift+D` then `W` | Scan all Ruby files in the project                     |
-| **DocScribe → Apply Safe Fixes**                      | `Ctrl+Shift+D` then `S` | Add docs to undocumented methods only                  |
-| **DocScribe → Apply Aggressive Fixes**                | `Ctrl+Shift+D` then `A` | Replace all existing YARD docs                         |
-| **DocScribe → Update Types from RBS**                 | —                       | Refresh YARD docs from RBS signatures                  |
+| Action                                  | Shortcut                | Description                                           |
+|-----------------------------------------|-------------------------|-------------------------------------------------------|
+| **DocScribe -> Check Current File**     | `Ctrl+Shift+D` then `C` | Analyze the active Ruby file for undocumented methods |
+| **DocScribe -> Check Entire Workspace** | `Ctrl+Shift+D` then `W` | Scan all Ruby files in the project                    |
+| **DocScribe -> Apply Safe Fixes**       | `Ctrl+Shift+D` then `S` | Add docs to undocumented methods only                 |
+| **DocScribe -> Apply Aggressive Fixes** | `Ctrl+Shift+D` then `A` | Replace all existing YARD docs                        |
+| **DocScribe -> Update Types from RBS**  | —                       | Refresh YARD docs from RBS signatures                 |
 
 All actions are available in the editor right-click menu under the **DocScribe** group.
 
@@ -80,16 +122,16 @@ auto-generate documentation for that method.
 
 ### Settings
 
-Navigate to **Settings → Tools → DocScribe**:
+Navigate to **Settings -> Tools -> DocScribe**:
 
-| Setting                    | Description                                            | Default      |
-|----------------------------|--------------------------------------------------------|--------------|
-| Command path               | Path to the docscribe executable                       | `docscribe`  |
-| Use bundle exec            | Run via `bundle exec`                                  | Off          |
-| Use RBS type signatures    | Enable RBS-based type inference                        | Off          |
-| Omit boilerplate text      | Skip boilerplate in generated docs                     | On           |
-| Hide comments by default   | Auto-fold YARD comment blocks on file open             | Off          |
-| Run on save                | Automatically check file diagnostics on save           | On           |
+| Setting                  | Description                                  | Default     |
+|--------------------------|----------------------------------------------|-------------|
+| Command path             | Path to the docscribe executable             | `docscribe` |
+| Use bundle exec          | Run via `bundle exec`                        | Off         |
+| Use RBS type signatures  | Enable RBS-based type inference              | Off         |
+| Omit boilerplate text    | Skip boilerplate in generated docs           | On          |
+| Hide comments by default | Auto-fold YARD comment blocks on file open   | Off         |
+| Run on save              | Automatically check file diagnostics on save | On          |
 
 ## Development
 
