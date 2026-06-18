@@ -17,6 +17,12 @@
   <a href="LICENSE">
     <img src="https://img.shields.io/github/license/FlorexLabs/docscribe-rubymine" alt="License">
   </a>
+  <a href="#requirements">
+    <img src="https://img.shields.io/badge/RubyMine-2026.1%2B-blue" alt="RubyMine">
+  </a>
+  <a href="#requirements">
+    <img src="https://img.shields.io/badge/ruby-%3E%3D%202.7-red" alt="Ruby">
+  </a>
 </p>
 
 **DocScribe** is a RubyMine plugin that auto-generates inline YARD documentation for Ruby methods
@@ -80,8 +86,8 @@ and install via Settings -> Plugins -> ⚙ -> Install Plugin from Disk.
 
 ### Actions
 
-| Action                                 | Shortcut                | Description                                           |
-|----------------------------------------|-------------------------|-------------------------------------------------------|
+| Action                                  | Shortcut                | Description                                           |
+|-----------------------------------------|-------------------------|-------------------------------------------------------|
 | **DocScribe -> Check Current File**     | `Ctrl+Shift+D` then `C` | Analyze the active Ruby file for undocumented methods |
 | **DocScribe -> Check Entire Workspace** | `Ctrl+Shift+D` then `W` | Scan all Ruby files in the project                    |
 | **DocScribe -> Apply Safe Fixes**       | `Ctrl+Shift+D` then `S` | Add docs to undocumented methods only                 |
