@@ -33,7 +33,7 @@ intellijPlatform {
     pluginConfiguration {
         id = "com.florexlabs.docscribe"
         name = "DocScribe"
-        version = providers.gradleProperty("pluginVersion")
+version = providers.gradleProperty("pluginVersion").get()
 
         ideaVersion {
             sinceBuild = providers.gradleProperty("pluginSinceBuild")
