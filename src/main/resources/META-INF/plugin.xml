@@ -1,0 +1,104 @@
+<idea-plugin>
+    <id>com.florexlabs.docscribe</id>
+    <name>DocScribe</name>
+    <vendor>FlorexLabs</vendor>
+
+    <description><![CDATA[
+        <p>Auto-generate inline YARD documentation for Ruby methods using <a href="https://github.com/unurgunite/docscribe">docscribe</a>.</p>
+        <h3>Features</h3>
+        <ul>
+            <li>Check Ruby files for missing YARD documentation</li>
+            <li>Apply safe fixes (add required tags)</li>
+            <li>Apply aggressive fixes (add full documentation)</li>
+            <li>Inline diagnostics on file open and save</li>
+            <li>Collapsible YARD comment blocks</li>
+            <li>RBS type inference</li>
+            <li>Rake file support</li>
+        </ul>
+        <p>Compatible with <strong>docscribe >= 1.5.0</strong>.</p>
+    ]]></description>
+
+    <change-notes><![CDATA[
+        Initial release.
+    ]]></change-notes>
+
+    <version>0.1.0</version>
+    <idea-version since-build="261" until-build="261.*"/>
+
+    <depends>com.intellij.modules.platform</depends>
+    <depends>com.intellij.modules.ruby</depends>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <applicationService serviceImplementation="com.florexlabs.docscribe.settings.DocscribeSettings"/>
+
+        <notificationGroup id="DocScribe" displayType="BALLOON" key="DocScribe notifications"/>
+
+        <annotator language="Ruby"
+                   implementationClass="com.florexlabs.docscribe.annotator.DocscribeAnnotator"/>
+
+        <applicationConfigurable
+                groupId="tools"
+                displayName="DocScribe"
+                id="com.florexlabs.docscribe.settings"
+                instance="com.florexlabs.docscribe.settings.DocscribeSettingsConfigurable"/>
+
+        <lang.foldingBuilder language="Ruby"
+                implementationClass="com.florexlabs.docscribe.folding.YardFoldingBuilder"/>
+    </extensions>
+
+    <actions>
+        <group id="com.florexlabs.docscribe.DocScribeGroup"
+               text="DocScribe" popup="true"
+               icon="/com/florexlabs/docscribe/icons/docscribe.svg">
+            <add-to-group group-id="EditorPopupMenu"
+                          anchor="first"/>
+            <reference ref="com.florexlabs.docscribe.CheckFileAction"/>
+            <reference ref="com.florexlabs.docscribe.SafeFixAction"/>
+            <reference ref="com.florexlabs.docscribe.AggressiveFixAction"/>
+            <separator/>
+            <reference ref="com.florexlabs.docscribe.CheckWorkspaceAction"/>
+            <reference ref="com.florexlabs.docscribe.UpdateTypesAction"/>
+        </group>
+
+        <action id="com.florexlabs.docscribe.CheckFileAction"
+                class="com.florexlabs.docscribe.actions.CheckFileAction"
+                text="Check Current File"
+                description="Run docscribe check on the current Ruby file">
+            <keyboard-shortcut keymap="$default"
+                               first-keystroke="ctrl shift D"
+                               second-keystroke="C"/>
+        </action>
+
+        <action id="com.florexlabs.docscribe.CheckWorkspaceAction"
+                class="com.florexlabs.docscribe.actions.CheckWorkspaceAction"
+                text="Check Entire Workspace"
+                description="Run docscribe check on all Ruby files in the project">
+            <keyboard-shortcut keymap="$default"
+                               first-keystroke="ctrl shift D"
+                               second-keystroke="W"/>
+        </action>
+
+        <action id="com.florexlabs.docscribe.SafeFixAction"
+                class="com.florexlabs.docscribe.actions.SafeFixAction"
+                text="Apply Safe Fixes"
+                description="Apply docscribe safe fixes to current file">
+            <keyboard-shortcut keymap="$default"
+                               first-keystroke="ctrl shift D"
+                               second-keystroke="S"/>
+        </action>
+
+        <action id="com.florexlabs.docscribe.AggressiveFixAction"
+                class="com.florexlabs.docscribe.actions.AggressiveFixAction"
+                text="Apply Aggressive Fixes"
+                description="Apply docscribe aggressive fixes to current file">
+            <keyboard-shortcut keymap="$default"
+                               first-keystroke="ctrl shift D"
+                               second-keystroke="A"/>
+        </action>
+
+        <action id="com.florexlabs.docscribe.UpdateTypesAction"
+                class="com.florexlabs.docscribe.actions.UpdateTypesAction"
+                text="Update Types from RBS"
+                description="Run docscribe update_types to refresh YARD docs from RBS signatures"/>
+    </actions>
+</idea-plugin>
