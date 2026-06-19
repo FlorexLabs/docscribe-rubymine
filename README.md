@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="src/main/resources/META-INF/pluginIcon_256x256.png" alt="DocScribe Logo" width="128">
+  <img src="icon/icon_256x256.png" alt="DocScribe Logo" width="128">
 </p>
 
 <h1 align="center">DocScribe for RubyMine</h1>
