@@ -62,6 +62,7 @@ class DocscribeDaemon(
      * Execute a docscribe command via the daemon process.
      * Falls back to CLI if the daemon is not running.
      */
+    @Suppress("TooGenericExceptionCaught")
     fun execute(
         command: String,
         file: String? = null,
@@ -132,6 +133,7 @@ class DocscribeDaemon(
         )
     }
 
+    @Suppress("TooGenericExceptionCaught")
     private fun ensureRunning(projectDir: String?) {
         if (alive) return
         val gemRoot =
@@ -146,6 +148,9 @@ class DocscribeDaemon(
                 ProcessBuilder(cmd)
                     .directory(File(gemRoot))
                     .redirectErrorStream(false)
+            if (log.isDebugEnabled) {
+                pb.environment()["DOCSCRIBE_DAEMON_DEBUG"] = "1"
+            }
             process = pb.start()
             writer = java.io.BufferedWriter(OutputStreamWriter(process!!.outputStream))
             reader = BufferedReader(InputStreamReader(process!!.inputStream))
@@ -235,7 +240,7 @@ class DocscribeDaemon(
                 writer?.write(req)
                 writer?.newLine()
                 writer?.flush()
-                process?.waitFor(5, TimeUnit.SECONDS)
+                process?.waitFor(SHUTDOWN_TIMEOUT_SECONDS, TimeUnit.SECONDS)
             } catch (_: Exception) {
             }
             die()
@@ -243,6 +248,7 @@ class DocscribeDaemon(
     }
 
     companion object {
+        private const val SHUTDOWN_TIMEOUT_SECONDS = 5L
         private var wrapperFile: File? = null
 
         @JvmStatic

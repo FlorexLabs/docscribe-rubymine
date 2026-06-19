@@ -119,14 +119,16 @@ class DocscribeAnnotator : ExternalAnnotator<AnnotatorFileInfo, DocscribeOutput>
                 DocscribeRunner.runDocscribe(options, settings)
             }
         val output =
-            if (!result.success || result.stdout.isBlank()) {
-                null
-            } else {
-                DocscribeOutputParser.parseJson(result.stdout)
+            when {
+                !result.success -> null
+                result.stdout.isBlank() -> DocscribeOutput(null, emptyList(), null)
+                else -> DocscribeOutputParser.parseJson(result.stdout)
             }
 
-        cache.put(info.projectDir, info.filePath, info.fileStamp, info.configHash, output)
-        return output
+        if (output != null) {
+            cache.put(info.projectDir, info.filePath, info.fileStamp, info.configHash, output)
+        }
+        return if (output == null || output.files.isEmpty()) null else output
     }
 
     override fun apply(
