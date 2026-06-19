@@ -10,6 +10,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
 
       - uses: actions/setup-java@v4
         with:
@@ -18,6 +20,42 @@ jobs:
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
+
+      - name: Check version consistency
+        run: |
+          HEAD_BRANCH="${{ github.head_ref }}"
+          if echo "$HEAD_BRANCH" | grep -q '^system/'; then
+            echo "⏭️ Skipping version checks for system/ branch"
+            exit 0
+          fi
+
+          COMMIT_MSG=$(git log -1 --format=%s)
+          MSG_VERSION=$(echo "$COMMIT_MSG" | grep -oE '\[[0-9]+\.[0-9]+\.[0-9]+\]' | tr -d '[]' || true)
+          PROP_VERSION=$(grep pluginVersion gradle.properties | cut -d= -f2 | tr -d ' ')
+          BASE_BRANCH="${{ github.base_ref }}"
+
+          if [ -z "$MSG_VERSION" ]; then
+            echo "❌ Commit message must contain version tag, e.g. [0.1.2]"
+            echo "  Got: $COMMIT_MSG"
+            exit 1
+          fi
+          if [ "$MSG_VERSION" != "$PROP_VERSION" ]; then
+            echo "❌ Version mismatch: commit says [$MSG_VERSION], plugin is $PROP_VERSION"
+            exit 1
+          fi
+          echo "✅ $MSG_VERSION = pluginVersion"
+
+          if echo "$BASE_BRANCH" | grep -qE '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
+            BRANCH_VERSION=$(echo "$BASE_BRANCH" | tr -d 'v')
+            if [ "$BRANCH_VERSION" != "$PROP_VERSION" ]; then
+              echo "❌ Branch version mismatch: merging into $BASE_BRANCH but plugin is $PROP_VERSION"
+              exit 1
+            fi
+            echo "✅ $BASE_BRANCH = pluginVersion"
+          else
+            echo "⏭️ Skipping branch check: base branch is '$BASE_BRANCH' (not a version branch)"
+          fi
+          echo "✅ All version checks passed"
 
       - name: Check formatting
         run: ./gradlew spotlessCheck
