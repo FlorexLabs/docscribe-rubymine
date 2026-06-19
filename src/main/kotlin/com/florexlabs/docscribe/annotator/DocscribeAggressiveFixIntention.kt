@@ -12,13 +12,8 @@ import com.intellij.openapi.progress.Task
 import com.intellij.openapi.project.Project
 import com.intellij.psi.PsiFile
 
-/**
- * Quick-fix intention that applies a **safe** docscribe fix to the annotated file.
- *
- * Appears as a lightbulb action on inline annotations from [DocscribeAnnotator].
- */
-class DocscribeFixIntention : IntentionAction {
-    override fun getText(): String = "DocScribe: Apply safe fix"
+class DocscribeAggressiveFixIntention : IntentionAction {
+    override fun getText(): String = "DocScribe: Apply aggressive fix"
 
     override fun getFamilyName(): String = "DocScribe"
 
@@ -37,7 +32,7 @@ class DocscribeFixIntention : IntentionAction {
         val vFile = psiFile.virtualFile ?: return
         val projectRoot = DocscribeRunner.findProjectRoot(vFile.path) ?: return
 
-        object : Task.Backgroundable(project, "DocScribe: applying fix...", false) {
+        object : Task.Backgroundable(project, "DocScribe: applying aggressive fix...", false) {
             var failed = false
 
             override fun run(indicator: ProgressIndicator) {
@@ -45,7 +40,7 @@ class DocscribeFixIntention : IntentionAction {
                     RunOptions(
                         projectDir = projectRoot,
                         file = vFile.path,
-                        strategy = DocscribeStrategy.SAFE,
+                        strategy = DocscribeStrategy.AGGRESSIVE,
                         formatJson = false,
                     )
                 val result = DocscribeRunner.runDocscribe(options)
@@ -56,12 +51,12 @@ class DocscribeFixIntention : IntentionAction {
                 val group = NotificationGroupManager.getInstance().getNotificationGroup("DocScribe")
                 if (failed) {
                     group
-                        .createNotification("DocScribe: failed to apply fix", NotificationType.ERROR)
+                        .createNotification("DocScribe: error applying aggressive fix", NotificationType.ERROR)
                         .notify(project)
                 } else {
                     vFile.refresh(true, false)
                     group
-                        .createNotification("DocScribe: fix applied", NotificationType.INFORMATION)
+                        .createNotification("DocScribe: aggressive fix applied", NotificationType.INFORMATION)
                         .notify(project)
                 }
             }

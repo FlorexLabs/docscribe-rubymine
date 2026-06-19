@@ -47,6 +47,7 @@ class AggressiveFixAction : AnAction() {
                 if (failed) {
                     notify(project, "DocScribe: error applying aggressive fix", NotificationType.ERROR)
                 } else {
+                    vFile.refresh(true, false)
                     notify(project, "DocScribe: aggressive fix applied", NotificationType.INFORMATION)
                 }
             }
