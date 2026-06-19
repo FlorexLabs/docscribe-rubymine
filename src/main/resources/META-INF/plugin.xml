@@ -30,6 +30,7 @@
 
   <extensions defaultExtensionNs="com.intellij">
     <applicationService serviceImplementation="com.florexlabs.docscribe.settings.DocscribeSettings"/>
+    <applicationService serviceImplementation="com.florexlabs.docscribe.annotator.DocscribeAnnotatorCache"/>
 
     <notificationGroup id="DocScribe" displayType="BALLOON" key="DocScribe notifications"/>
 

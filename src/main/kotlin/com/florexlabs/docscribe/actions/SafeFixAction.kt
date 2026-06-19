@@ -9,6 +9,7 @@ import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.CommonDataKeys
+import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.progress.ProgressIndicator
 import com.intellij.openapi.progress.Task
 import com.intellij.openapi.project.Project
@@ -20,6 +21,12 @@ class SafeFixAction : AnAction() {
     override fun actionPerformed(e: AnActionEvent) {
         val project = e.project ?: return
         val vFile = e.getData(CommonDataKeys.VIRTUAL_FILE) ?: return
+
+        val editor = e.getData(CommonDataKeys.EDITOR)
+        if (editor != null) {
+            FileDocumentManager.getInstance().saveDocument(editor.document)
+        }
+
         val projectRoot =
             DocscribeRunner.findProjectRoot(vFile.path) ?: run {
                 notify(project, "No Gemfile found in project tree", NotificationType.ERROR)
@@ -45,7 +52,7 @@ class SafeFixAction : AnAction() {
                 if (failed) {
                     notify(project, "DocScribe: error applying safe fix", NotificationType.ERROR)
                 } else {
-                    vFile.refresh(true, false)
+                    FileDocumentManager.getInstance().reloadFiles(vFile)
                     notify(project, "DocScribe: safe fix applied", NotificationType.INFORMATION)
                 }
             }

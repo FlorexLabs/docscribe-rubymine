@@ -9,6 +9,7 @@ import com.intellij.codeInsight.intention.IntentionAction
 import com.intellij.notification.NotificationGroupManager
 import com.intellij.notification.NotificationType
 import com.intellij.openapi.editor.Editor
+import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.progress.ProgressIndicator
 import com.intellij.openapi.progress.Task
 import com.intellij.openapi.project.Project
@@ -32,6 +33,11 @@ class DocscribeCheckIntention : IntentionAction {
     ) {
         val psiFile = file ?: return
         val vFile = psiFile.virtualFile ?: return
+
+        if (editor != null) {
+            FileDocumentManager.getInstance().saveDocument(editor.document)
+        }
+
         val projectRoot = DocscribeRunner.findProjectRoot(vFile.path) ?: return
 
         object : Task.Backgroundable(project, "DocScribe: checking file...", false) {

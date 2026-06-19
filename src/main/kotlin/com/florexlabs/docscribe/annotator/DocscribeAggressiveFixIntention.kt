@@ -7,6 +7,7 @@ import com.intellij.codeInsight.intention.IntentionAction
 import com.intellij.notification.NotificationGroupManager
 import com.intellij.notification.NotificationType
 import com.intellij.openapi.editor.Editor
+import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.progress.ProgressIndicator
 import com.intellij.openapi.progress.Task
 import com.intellij.openapi.project.Project
@@ -30,6 +31,11 @@ class DocscribeAggressiveFixIntention : IntentionAction {
     ) {
         val psiFile = file ?: return
         val vFile = psiFile.virtualFile ?: return
+
+        if (editor != null) {
+            FileDocumentManager.getInstance().saveDocument(editor.document)
+        }
+
         val projectRoot = DocscribeRunner.findProjectRoot(vFile.path) ?: return
 
         object : Task.Backgroundable(project, "DocScribe: applying aggressive fix...", false) {
@@ -54,7 +60,7 @@ class DocscribeAggressiveFixIntention : IntentionAction {
                         .createNotification("DocScribe: error applying aggressive fix", NotificationType.ERROR)
                         .notify(project)
                 } else {
-                    vFile.refresh(true, false)
+                    FileDocumentManager.getInstance().reloadFiles(vFile)
                     group
                         .createNotification("DocScribe: aggressive fix applied", NotificationType.INFORMATION)
                         .notify(project)

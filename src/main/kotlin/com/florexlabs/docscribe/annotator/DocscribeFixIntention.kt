@@ -7,6 +7,7 @@ import com.intellij.codeInsight.intention.IntentionAction
 import com.intellij.notification.NotificationGroupManager
 import com.intellij.notification.NotificationType
 import com.intellij.openapi.editor.Editor
+import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.progress.ProgressIndicator
 import com.intellij.openapi.progress.Task
 import com.intellij.openapi.project.Project
@@ -35,6 +36,12 @@ class DocscribeFixIntention : IntentionAction {
     ) {
         val psiFile = file ?: return
         val vFile = psiFile.virtualFile ?: return
+
+        // Save editor buffer to disk so docscribe reads the latest version
+        if (editor != null) {
+            FileDocumentManager.getInstance().saveDocument(editor.document)
+        }
+
         val projectRoot = DocscribeRunner.findProjectRoot(vFile.path) ?: return
 
         object : Task.Backgroundable(project, "DocScribe: applying fix...", false) {
@@ -59,7 +66,7 @@ class DocscribeFixIntention : IntentionAction {
                         .createNotification("DocScribe: failed to apply fix", NotificationType.ERROR)
                         .notify(project)
                 } else {
-                    vFile.refresh(true, false)
+                    FileDocumentManager.getInstance().reloadFiles(vFile)
                     group
                         .createNotification("DocScribe: fix applied", NotificationType.INFORMATION)
                         .notify(project)
