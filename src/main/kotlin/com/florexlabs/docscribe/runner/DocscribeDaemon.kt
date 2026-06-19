@@ -6,10 +6,13 @@ import com.google.gson.GsonBuilder
 import com.google.gson.JsonObject
 import com.google.gson.annotations.SerializedName
 import com.intellij.execution.ExecutionException
+import com.intellij.notification.NotificationGroupManager
+import com.intellij.notification.NotificationType
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.roots.ProjectRootManager
 import java.io.BufferedReader
 import java.io.File
 import java.io.InputStreamReader
@@ -142,7 +145,7 @@ class DocscribeDaemon(
                 ?: return
         try {
             val wrapperPath = extractWrapper()
-            val cmd = listOf("bundle", "exec", "ruby", wrapperPath)
+            val cmd = buildCommand(wrapperPath)
 
             val pb =
                 ProcessBuilder(cmd)
@@ -151,7 +154,16 @@ class DocscribeDaemon(
             if (log.isDebugEnabled) {
                 pb.environment()["DOCSCRIBE_DAEMON_DEBUG"] = "1"
             }
+            // Set PATH to include SDK's bin dir so bundle/ruby are found together
+            val sdk = ProjectRootManager.getInstance(project).projectSdk
+            if (sdk?.homePath != null) {
+                val rubyBin = File(sdk.homePath, "bin").absolutePath
+                val currentPath = pb.environment()["PATH"] ?: ""
+                pb.environment()["PATH"] = "$rubyBin${File.pathSeparator}$currentPath"
+                pb.environment()["BUNDLE_GEMFILE"] = File(gemRoot, "Gemfile").absolutePath
+            }
             process = pb.start()
+            failFastIfDead(process!!)
             writer = java.io.BufferedWriter(OutputStreamWriter(process!!.outputStream))
             reader = BufferedReader(InputStreamReader(process!!.inputStream))
 
@@ -177,7 +189,39 @@ class DocscribeDaemon(
             log.info("Docscribe daemon started (pid=${process!!.pid()}, gemRoot=$gemRoot)")
         } catch (e: Exception) {
             log.warn("Failed to start docscribe daemon", e)
+            val cause = e.message ?: "Unknown error"
+            NotificationGroupManager
+                .getInstance()
+                .getNotificationGroup("DocScribe")
+                .createNotification("DocScribe daemon failed to start: $cause", NotificationType.WARNING)
+                .notify(project)
             die()
+        }
+    }
+
+    private fun buildCommand(wrapperPath: String): List<String> {
+        val sdk = ProjectRootManager.getInstance(project).projectSdk
+        val sdkHome = sdk?.homePath
+        if (sdkHome != null) {
+            val rubyExe = File(sdkHome, "bin/ruby").absolutePath
+            log.info("Using Ruby SDK: $rubyExe")
+            return listOf(rubyExe, "-S", "bundle", "exec", "ruby", wrapperPath)
+        }
+        // Fallback: run through user's login shell for PATH discovery
+        val shell = System.getenv("SHELL") ?: "/bin/bash"
+        log.warn("No Ruby SDK found, falling back to shell: $shell -lc \"ruby ...\"")
+        return listOf(shell, "-lc", "ruby '$wrapperPath'")
+    }
+
+    private fun failFastIfDead(proc: Process) {
+        if (!proc.isAlive) {
+            val stderr = proc.errorStream.bufferedReader().readText()
+            throw ExecutionException("Daemon exited immediately: $stderr")
+        }
+        Thread.sleep(STARTUP_WAIT_MS)
+        if (!proc.isAlive) {
+            val stderr = proc.errorStream.bufferedReader().readText()
+            throw ExecutionException("Daemon crashed after ${STARTUP_WAIT_MS}ms: $stderr")
         }
     }
 
@@ -249,6 +293,7 @@ class DocscribeDaemon(
 
     companion object {
         private const val SHUTDOWN_TIMEOUT_SECONDS = 5L
+        private const val STARTUP_WAIT_MS = 200L
         private var wrapperFile: File? = null
 
         @JvmStatic
