@@ -1,5 +1,6 @@
 package com.florexlabs.docscribe.annotator
 
+import com.florexlabs.docscribe.runner.DocscribeDaemon
 import com.florexlabs.docscribe.runner.DocscribeRunner
 import com.florexlabs.docscribe.runner.DocscribeStrategy
 import com.florexlabs.docscribe.runner.RunOptions
@@ -49,7 +50,7 @@ class DocscribeAggressiveFixIntention : IntentionAction {
                         strategy = DocscribeStrategy.AGGRESSIVE,
                         formatJson = false,
                     )
-                val result = DocscribeRunner.runDocscribe(options)
+                val result = DocscribeDaemon.executeWithFallback(project, options)
                 failed = result.exitCode >= 2
             }
 

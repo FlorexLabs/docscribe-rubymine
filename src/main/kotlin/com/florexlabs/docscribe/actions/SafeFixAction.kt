@@ -1,5 +1,6 @@
 package com.florexlabs.docscribe.actions
 
+import com.florexlabs.docscribe.runner.DocscribeDaemon
 import com.florexlabs.docscribe.runner.DocscribeRunner
 import com.florexlabs.docscribe.runner.DocscribeStrategy
 import com.florexlabs.docscribe.runner.RunOptions
@@ -44,7 +45,7 @@ class SafeFixAction : AnAction() {
                         strategy = DocscribeStrategy.SAFE,
                         formatJson = false,
                     )
-                val result = DocscribeRunner.runDocscribe(options)
+                val result = DocscribeDaemon.executeWithFallback(project, options)
                 failed = result.exitCode >= 2
             }
 

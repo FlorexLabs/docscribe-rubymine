@@ -57,13 +57,13 @@ class DocscribeAnnotatorCache {
     /**
      * Invalidates all cache entries for a given file path.
      */
+    @Suppress("unused")
     fun invalidate(filePath: String) {
         cache.keys.removeIf { key -> key.filePath == filePath }
     }
 
     companion object {
         @JvmStatic
-        fun getInstance(): DocscribeAnnotatorCache =
-            ApplicationManager.getApplication().getService(DocscribeAnnotatorCache::class.java)
+        fun getInstance(): DocscribeAnnotatorCache = ApplicationManager.getApplication().getService(DocscribeAnnotatorCache::class.java)
     }
 }

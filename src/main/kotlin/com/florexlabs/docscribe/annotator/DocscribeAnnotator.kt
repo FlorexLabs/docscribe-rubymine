@@ -1,5 +1,6 @@
 package com.florexlabs.docscribe.annotator
 
+import com.florexlabs.docscribe.runner.DocscribeDaemon
 import com.florexlabs.docscribe.runner.DocscribeOutput
 import com.florexlabs.docscribe.runner.DocscribeOutputParser
 import com.florexlabs.docscribe.runner.DocscribeRunner
@@ -11,6 +12,7 @@ import com.intellij.lang.annotation.ExternalAnnotator
 import com.intellij.lang.annotation.HighlightSeverity
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.fileEditor.FileDocumentManager
+import com.intellij.openapi.project.ProjectManager
 import com.intellij.openapi.util.TextRange
 import com.intellij.psi.PsiDocumentManager
 import com.intellij.psi.PsiFile
@@ -33,7 +35,11 @@ data class AnnotatorFileInfo(
  * Skips unsaved documents (docscribe reads from disk) and caches results by file modification stamp.
  */
 class DocscribeAnnotator : ExternalAnnotator<AnnotatorFileInfo, DocscribeOutput>() {
-    override fun collectInformation(file: PsiFile, editor: Editor, hasErrors: Boolean): AnnotatorFileInfo? {
+    override fun collectInformation(
+        file: PsiFile,
+        editor: Editor,
+        hasErrors: Boolean,
+    ): AnnotatorFileInfo? {
         if (!file.name.endsWith(".rb") && !file.name.endsWith(".rake")) return null
         val vFile = file.virtualFile ?: return null
         val projectDir = file.project.basePath ?: return null
@@ -42,12 +48,13 @@ class DocscribeAnnotator : ExternalAnnotator<AnnotatorFileInfo, DocscribeOutput>
         if (FileDocumentManager.getInstance().isDocumentUnsaved(editor.document)) return null
 
         val settings = DocscribeSettings.getInstance()
-        val configHash = Objects.hash(
-            settings.commandPath,
-            settings.useBundleExec,
-            settings.useRbs,
-            settings.omitBoilerplate,
-        )
+        val configHash =
+            Objects.hash(
+                settings.commandPath,
+                settings.useBundleExec,
+                settings.useRbs,
+                settings.omitBoilerplate,
+            )
 
         return AnnotatorFileInfo(
             filePath = vFile.path,
@@ -63,12 +70,13 @@ class DocscribeAnnotator : ExternalAnnotator<AnnotatorFileInfo, DocscribeOutput>
         val projectDir = file.project.basePath ?: return null
 
         val settings = DocscribeSettings.getInstance()
-        val configHash = Objects.hash(
-            settings.commandPath,
-            settings.useBundleExec,
-            settings.useRbs,
-            settings.omitBoilerplate,
-        )
+        val configHash =
+            Objects.hash(
+                settings.commandPath,
+                settings.useBundleExec,
+                settings.useRbs,
+                settings.omitBoilerplate,
+            )
 
         return AnnotatorFileInfo(
             filePath = vFile.path,
@@ -85,17 +93,44 @@ class DocscribeAnnotator : ExternalAnnotator<AnnotatorFileInfo, DocscribeOutput>
             return if (cached.files.isEmpty()) null else cached
         }
 
-        val projectRoot = DocscribeRunner.findProjectRoot(info.filePath) ?: return null
-        val options =
-            RunOptions(
-                projectDir = projectRoot,
-                file = info.filePath,
-                strategy = DocscribeStrategy.CHECK,
-                formatJson = true,
-            )
-        val result = DocscribeRunner.runDocscribe(options)
-        val output = if (!result.success || result.stdout.isBlank()) null
-                     else DocscribeOutputParser.parseJson(result.stdout)
+        val settings = DocscribeSettings.getInstance()
+        val useDaemon = settings.useDaemon
+        val project =
+            if (useDaemon) {
+                ProjectManager.getInstance().openProjects.find { p ->
+                    p.basePath != null && info.projectDir.startsWith(p.basePath!!)
+                }
+            } else {
+                null
+            }
+
+        val result =
+            if (project != null) {
+                val options =
+                    RunOptions(
+                        projectDir = info.projectDir,
+                        file = info.filePath,
+                        strategy = DocscribeStrategy.CHECK,
+                        formatJson = true,
+                    )
+                DocscribeDaemon.executeWithFallback(project, options, settings)
+            } else {
+                val projectRoot = DocscribeRunner.findProjectRoot(info.filePath) ?: return null
+                val options =
+                    RunOptions(
+                        projectDir = projectRoot,
+                        file = info.filePath,
+                        strategy = DocscribeStrategy.CHECK,
+                        formatJson = true,
+                    )
+                DocscribeRunner.runDocscribe(options, settings)
+            }
+        val output =
+            if (!result.success || result.stdout.isBlank()) {
+                null
+            } else {
+                DocscribeOutputParser.parseJson(result.stdout)
+            }
 
         cache.put(info.projectDir, info.filePath, info.fileStamp, info.configHash, output)
         return output

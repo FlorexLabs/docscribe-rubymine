@@ -1,5 +1,6 @@
 package com.florexlabs.docscribe.actions
 
+import com.florexlabs.docscribe.runner.DocscribeDaemon
 import com.florexlabs.docscribe.runner.DocscribeOutputParser
 import com.florexlabs.docscribe.runner.DocscribeRunner
 import com.florexlabs.docscribe.runner.DocscribeStrategy
@@ -43,7 +44,7 @@ class CheckFileAction : AnAction() {
                         strategy = DocscribeStrategy.CHECK,
                         formatJson = true,
                     )
-                result = DocscribeRunner.runDocscribe(options)
+                result = DocscribeDaemon.executeWithFallback(project, options)
             }
 
             override fun onSuccess() {
