@@ -7,6 +7,8 @@ import com.intellij.codeInsight.intention.IntentionAction
 import com.intellij.notification.NotificationGroupManager
 import com.intellij.notification.NotificationType
 import com.intellij.openapi.editor.Editor
+import com.intellij.openapi.progress.ProgressIndicator
+import com.intellij.openapi.progress.Task
 import com.intellij.openapi.project.Project
 import com.intellij.psi.PsiFile
 
@@ -34,25 +36,36 @@ class DocscribeFixIntention : IntentionAction {
         val psiFile = file ?: return
         val vFile = psiFile.virtualFile ?: return
         val projectRoot = DocscribeRunner.findProjectRoot(vFile.path) ?: return
-        val options =
-            RunOptions(
-                projectDir = projectRoot,
-                file = vFile.path,
-                strategy = DocscribeStrategy.SAFE,
-                formatJson = false,
-            )
-        val result = DocscribeRunner.runDocscribe(options)
-        val group = NotificationGroupManager.getInstance().getNotificationGroup("DocScribe")
-        if (result.exitCode >= 2) {
-            group
-                .createNotification("DocScribe: failed to apply fix", NotificationType.ERROR)
-                .notify(project)
-        } else {
-            group
-                .createNotification("DocScribe: fix applied", NotificationType.INFORMATION)
-                .notify(project)
-        }
+
+        object : Task.Backgroundable(project, "DocScribe: applying fix...", false) {
+            var failed = false
+
+            override fun run(indicator: ProgressIndicator) {
+                val options =
+                    RunOptions(
+                        projectDir = projectRoot,
+                        file = vFile.path,
+                        strategy = DocscribeStrategy.SAFE,
+                        formatJson = false,
+                    )
+                val result = DocscribeRunner.runDocscribe(options)
+                failed = result.exitCode >= 2
+            }
+
+            override fun onSuccess() {
+                val group = NotificationGroupManager.getInstance().getNotificationGroup("DocScribe")
+                if (failed) {
+                    group
+                        .createNotification("DocScribe: failed to apply fix", NotificationType.ERROR)
+                        .notify(project)
+                } else {
+                    group
+                        .createNotification("DocScribe: fix applied", NotificationType.INFORMATION)
+                        .notify(project)
+                }
+            }
+        }.queue()
     }
 
-    override fun startInWriteAction(): Boolean = true
+    override fun startInWriteAction(): Boolean = false
 }

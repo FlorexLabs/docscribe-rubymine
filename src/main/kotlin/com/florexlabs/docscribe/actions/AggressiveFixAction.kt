@@ -9,6 +9,8 @@ import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.CommonDataKeys
+import com.intellij.openapi.progress.ProgressIndicator
+import com.intellij.openapi.progress.Task
 import com.intellij.openapi.project.Project
 
 /**
@@ -25,19 +27,30 @@ class AggressiveFixAction : AnAction() {
                 notify(project, "No Gemfile found in project tree", NotificationType.ERROR)
                 return
             }
-        val options =
-            RunOptions(
-                projectDir = projectRoot,
-                file = vFile.path,
-                strategy = DocscribeStrategy.AGGRESSIVE,
-                formatJson = false,
-            )
-        val result = DocscribeRunner.runDocscribe(options)
-        if (result.exitCode >= 2) {
-            notify(project, "DocScribe: error applying aggressive fix", NotificationType.ERROR)
-            return
-        }
-        notify(project, "DocScribe: aggressive fix applied", NotificationType.INFORMATION)
+
+        object : Task.Backgroundable(project, "DocScribe: applying aggressive fix...", false) {
+            var failed = false
+
+            override fun run(indicator: ProgressIndicator) {
+                val options =
+                    RunOptions(
+                        projectDir = projectRoot,
+                        file = vFile.path,
+                        strategy = DocscribeStrategy.AGGRESSIVE,
+                        formatJson = false,
+                    )
+                val result = DocscribeRunner.runDocscribe(options)
+                failed = result.exitCode >= 2
+            }
+
+            override fun onSuccess() {
+                if (failed) {
+                    notify(project, "DocScribe: error applying aggressive fix", NotificationType.ERROR)
+                } else {
+                    notify(project, "DocScribe: aggressive fix applied", NotificationType.INFORMATION)
+                }
+            }
+        }.queue()
     }
 
     override fun update(e: AnActionEvent) {

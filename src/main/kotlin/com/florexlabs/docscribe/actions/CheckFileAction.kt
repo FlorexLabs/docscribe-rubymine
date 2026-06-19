@@ -11,13 +11,10 @@ import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.CommonDataKeys
+import com.intellij.openapi.progress.ProgressIndicator
+import com.intellij.openapi.progress.Task
 import com.intellij.openapi.project.Project
 
-/**
- * Run docscribe **check** on the currently open Ruby file.
- *
- * Visible only for `.rb` files. Reports findings via a DocScribe notification balloon.
- */
 class CheckFileAction : AnAction() {
     override fun actionPerformed(e: AnActionEvent) {
         val project = e.project ?: return
@@ -27,20 +24,31 @@ class CheckFileAction : AnAction() {
                 showError(project, "No Gemfile found in project tree")
                 return
             }
-        val options =
-            RunOptions(
-                projectDir = projectRoot,
-                file = vFile.path,
-                strategy = DocscribeStrategy.CHECK,
-                formatJson = true,
-            )
-        val result = DocscribeRunner.runDocscribe(options)
-        if (result.exitCode >= 2) {
-            showError(project, "DocScribe: error running docscribe")
-            return
-        }
-        val summary = buildSummary(result)
-        notify(project, summary, if (result.hasIssues) NotificationType.WARNING else NotificationType.INFORMATION)
+
+        object : Task.Backgroundable(project, "DocScribe: checking file...", false) {
+            var result: RunResult? = null
+
+            override fun run(indicator: ProgressIndicator) {
+                val options =
+                    RunOptions(
+                        projectDir = projectRoot,
+                        file = vFile.path,
+                        strategy = DocscribeStrategy.CHECK,
+                        formatJson = true,
+                    )
+                result = DocscribeRunner.runDocscribe(options)
+            }
+
+            override fun onSuccess() {
+                val r = result ?: return
+                if (r.exitCode >= 2) {
+                    showError(project, "DocScribe: error running docscribe")
+                    return
+                }
+                val summary = buildSummary(r)
+                notify(project, summary, if (r.hasIssues) NotificationType.WARNING else NotificationType.INFORMATION)
+            }
+        }.queue()
     }
 
     override fun update(e: AnActionEvent) {
