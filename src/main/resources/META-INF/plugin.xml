@@ -44,22 +44,12 @@
 
         <lang.foldingBuilder language="Ruby"
                 implementationClass="com.florexlabs.docscribe.folding.YardFoldingBuilder"/>
+
+        <dependencySupport kind="ruby" coordinate="docscribe" displayName="docscribe gem"/>
+        <dependencySupport kind="ruby" coordinate="rbs" displayName="RBS"/>
     </extensions>
 
     <actions>
-        <group id="com.florexlabs.docscribe.DocScribeGroup"
-               text="DocScribe" popup="true"
-               icon="/com/florexlabs/docscribe/icons/docscribe.svg">
-            <add-to-group group-id="EditorPopupMenu"
-                          anchor="first"/>
-            <reference ref="com.florexlabs.docscribe.CheckFileAction"/>
-            <reference ref="com.florexlabs.docscribe.SafeFixAction"/>
-            <reference ref="com.florexlabs.docscribe.AggressiveFixAction"/>
-            <separator/>
-            <reference ref="com.florexlabs.docscribe.CheckWorkspaceAction"/>
-            <reference ref="com.florexlabs.docscribe.UpdateTypesAction"/>
-        </group>
-
         <action id="com.florexlabs.docscribe.CheckFileAction"
                 class="com.florexlabs.docscribe.actions.CheckFileAction"
                 text="Check Current File"
@@ -100,5 +90,18 @@
                 class="com.florexlabs.docscribe.actions.UpdateTypesAction"
                 text="Update Types from RBS"
                 description="Run docscribe update_types to refresh YARD docs from RBS signatures"/>
+
+        <group id="com.florexlabs.docscribe.DocScribeGroup"
+               text="DocScribe" popup="true"
+               icon="/com/florexlabs/docscribe/icons/docscribe.png">
+            <add-to-group group-id="EditorPopupMenu"
+                          anchor="first"/>
+            <reference ref="com.florexlabs.docscribe.CheckFileAction"/>
+            <reference ref="com.florexlabs.docscribe.SafeFixAction"/>
+            <reference ref="com.florexlabs.docscribe.AggressiveFixAction"/>
+            <separator/>
+            <reference ref="com.florexlabs.docscribe.CheckWorkspaceAction"/>
+            <reference ref="com.florexlabs.docscribe.UpdateTypesAction"/>
+        </group>
     </actions>
 </idea-plugin>
