@@ -1,5 +1,6 @@
 package com.florexlabs.docscribe.actions
 
+import com.florexlabs.docscribe.runner.DocscribeDaemon
 import com.florexlabs.docscribe.runner.DocscribeOutputParser
 import com.florexlabs.docscribe.runner.DocscribeRunner
 import com.florexlabs.docscribe.runner.DocscribeStrategy
@@ -9,7 +10,6 @@ import com.intellij.notification.NotificationType
 import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
-import com.intellij.openapi.actionSystem.CommonDataKeys
 import com.intellij.openapi.progress.ProgressIndicator
 import com.intellij.openapi.progress.Task
 import com.intellij.openapi.project.Project
@@ -41,7 +41,7 @@ class CheckWorkspaceAction : AnAction() {
                         strategy = DocscribeStrategy.CHECK,
                         formatJson = true,
                     )
-                val result = DocscribeRunner.runDocscribe(options)
+                val result = DocscribeDaemon.executeWithFallback(project, options)
                 if (result.exitCode >= 2) {
                     notify(project, "DocScribe: error running docscribe", NotificationType.ERROR)
                     return

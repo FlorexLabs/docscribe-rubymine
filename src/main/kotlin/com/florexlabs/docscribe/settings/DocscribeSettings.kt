@@ -21,6 +21,7 @@ class DocscribeSettings : PersistentStateComponent<DocscribeSettings> {
     var useRbs: Boolean = false
     var omitBoilerplate: Boolean = true
     var hideCommentsByDefault: Boolean = false
+    var useDaemon: Boolean = true
 
     override fun getState(): DocscribeSettings = this
 
