@@ -1,4 +1,4 @@
-package com.florexlabs.docscribe.actions
+package com.florexlabs.docscribe.annotator
 
 import com.florexlabs.docscribe.runner.DocscribeDaemon
 import com.florexlabs.docscribe.runner.DocscribeOutputParser
@@ -6,32 +6,40 @@ import com.florexlabs.docscribe.runner.DocscribeRunner
 import com.florexlabs.docscribe.runner.DocscribeStrategy
 import com.florexlabs.docscribe.runner.RunOptions
 import com.florexlabs.docscribe.runner.RunResult
+import com.intellij.codeInsight.intention.IntentionAction
 import com.intellij.notification.NotificationGroupManager
 import com.intellij.notification.NotificationType
-import com.intellij.openapi.actionSystem.ActionUpdateThread
-import com.intellij.openapi.actionSystem.AnAction
-import com.intellij.openapi.actionSystem.AnActionEvent
-import com.intellij.openapi.actionSystem.CommonDataKeys
+import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.progress.ProgressIndicator
 import com.intellij.openapi.progress.Task
 import com.intellij.openapi.project.Project
+import com.intellij.psi.PsiFile
 
-class CheckFileAction : AnAction() {
-    override fun actionPerformed(e: AnActionEvent) {
-        val project = e.project ?: return
-        val vFile = e.getData(CommonDataKeys.VIRTUAL_FILE) ?: return
+class DocscribeCheckIntention : IntentionAction {
+    override fun getText(): String = "DocScribe: Check current file"
 
-        val editor = e.getData(CommonDataKeys.EDITOR)
+    override fun getFamilyName(): String = "DocScribe"
+
+    override fun isAvailable(
+        project: Project,
+        editor: Editor?,
+        file: PsiFile?,
+    ): Boolean = file != null && file.name.endsWith(".rb")
+
+    override fun invoke(
+        project: Project,
+        editor: Editor?,
+        file: PsiFile?,
+    ) {
+        val psiFile = file ?: return
+        val vFile = psiFile.virtualFile ?: return
+
         if (editor != null) {
             FileDocumentManager.getInstance().saveDocument(editor.document)
         }
 
-        val projectRoot =
-            DocscribeRunner.findProjectRoot(vFile.path) ?: run {
-                showError(project, "No Gemfile found in project tree")
-                return
-            }
+        val projectRoot = DocscribeRunner.findProjectRoot(vFile.path) ?: return
 
         object : Task.Backgroundable(project, "DocScribe: checking file...", false) {
             var result: RunResult? = null
@@ -49,22 +57,22 @@ class CheckFileAction : AnAction() {
 
             override fun onSuccess() {
                 val r = result ?: return
+                val group = NotificationGroupManager.getInstance().getNotificationGroup("DocScribe")
                 if (r.exitCode >= 2) {
-                    showError(project, "DocScribe: error running docscribe")
+                    group
+                        .createNotification("DocScribe: error running docscribe", NotificationType.ERROR)
+                        .notify(project)
                     return
                 }
                 val summary = buildSummary(r)
-                notify(project, summary, if (r.hasIssues) NotificationType.WARNING else NotificationType.INFORMATION)
+                group
+                    .createNotification(summary, if (r.hasIssues) NotificationType.WARNING else NotificationType.INFORMATION)
+                    .notify(project)
             }
         }.queue()
     }
 
-    override fun update(e: AnActionEvent) {
-        val file = e.getData(CommonDataKeys.VIRTUAL_FILE)
-        e.presentation.isEnabledAndVisible = file != null && file.name.endsWith(".rb")
-    }
-
-    override fun getActionUpdateThread() = ActionUpdateThread.BGT
+    override fun startInWriteAction(): Boolean = false
 
     private fun buildSummary(result: RunResult): String {
         val parsed = DocscribeOutputParser.parseJson(result.stdout)
@@ -78,21 +86,5 @@ class CheckFileAction : AnAction() {
             }
         }
         return if (result.hasIssues) "DocScribe: issues found" else "DocScribe: OK"
-    }
-
-    private fun notify(
-        project: Project,
-        content: String,
-        type: NotificationType,
-    ) {
-        val group = NotificationGroupManager.getInstance().getNotificationGroup("DocScribe")
-        group.createNotification(content, type).notify(project)
-    }
-
-    private fun showError(
-        project: Project,
-        message: String,
-    ) {
-        notify(project, message, NotificationType.ERROR)
     }
 }

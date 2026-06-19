@@ -1,6 +1,7 @@
 package com.florexlabs.docscribe.runner
 
 import com.florexlabs.docscribe.settings.DocscribeSettings
+import com.intellij.execution.ExecutionException
 import com.intellij.execution.configurations.GeneralCommandLine
 import com.intellij.execution.process.CapturingProcessHandler
 import java.io.File
@@ -76,7 +77,18 @@ class DefaultCommandExecutor : CommandExecutor {
                 .withParameters(args)
                 .withWorkDirectory(cwd)
         val handler = CapturingProcessHandler(commandLine)
-        val output = handler.runProcess()
+        val output =
+            try {
+                handler.runProcess(120000)
+            } catch (_: ExecutionException) {
+                return RunResult(
+                    success = false,
+                    hasIssues = false,
+                    exitCode = 2,
+                    stdout = "",
+                    stderr = "Process timed out or failed after 120s",
+                )
+            }
         val exitCode = output.exitCode
         return RunResult(
             success = exitCode != 2,

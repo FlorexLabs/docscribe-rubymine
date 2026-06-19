@@ -21,6 +21,8 @@ class DocscribeSettingsConfigurable : Configurable {
 
     @JvmField var runOnSaveCheckBox = JBCheckBox("Run on save")
 
+    @JvmField var useDaemonCheckBox = JBCheckBox("Use persistent daemon (faster)")
+
     @JvmField var omitBoilerplateCheckBox = JBCheckBox("Omit boilerplate text")
 
     @JvmField var hideCommentsCheckBox = JBCheckBox("Hide comments by default")
@@ -34,6 +36,7 @@ class DocscribeSettingsConfigurable : Configurable {
         useBundleExecCheckBox.isSelected = settings.useBundleExec
         useRbsCheckBox.isSelected = settings.useRbs
         runOnSaveCheckBox.isSelected = settings.runOnSave
+        useDaemonCheckBox.isSelected = settings.useDaemon
         omitBoilerplateCheckBox.isSelected = settings.omitBoilerplate
         hideCommentsCheckBox.isSelected = settings.hideCommentsByDefault
         panel =
@@ -42,6 +45,7 @@ class DocscribeSettingsConfigurable : Configurable {
                 .addLabeledComponent("Command path:", commandPathField)
                 .addComponent(useBundleExecCheckBox)
                 .addComponent(useRbsCheckBox)
+                .addComponent(useDaemonCheckBox)
                 .addComponent(omitBoilerplateCheckBox)
                 .addComponent(hideCommentsCheckBox)
                 .addComponent(runOnSaveCheckBox)
@@ -55,6 +59,7 @@ class DocscribeSettingsConfigurable : Configurable {
         return commandPathField.text != s.commandPath ||
             useBundleExecCheckBox.isSelected != s.useBundleExec ||
             useRbsCheckBox.isSelected != s.useRbs ||
+            useDaemonCheckBox.isSelected != s.useDaemon ||
             omitBoilerplateCheckBox.isSelected != s.omitBoilerplate ||
             hideCommentsCheckBox.isSelected != s.hideCommentsByDefault ||
             runOnSaveCheckBox.isSelected != s.runOnSave
@@ -65,6 +70,7 @@ class DocscribeSettingsConfigurable : Configurable {
         s.commandPath = commandPathField.text
         s.useBundleExec = useBundleExecCheckBox.isSelected
         s.useRbs = useRbsCheckBox.isSelected
+        s.useDaemon = useDaemonCheckBox.isSelected
         s.omitBoilerplate = omitBoilerplateCheckBox.isSelected
         s.hideCommentsByDefault = hideCommentsCheckBox.isSelected
         s.runOnSave = runOnSaveCheckBox.isSelected
@@ -75,6 +81,7 @@ class DocscribeSettingsConfigurable : Configurable {
         commandPathField.text = s.commandPath
         useBundleExecCheckBox.isSelected = s.useBundleExec
         useRbsCheckBox.isSelected = s.useRbs
+        useDaemonCheckBox.isSelected = s.useDaemon
         omitBoilerplateCheckBox.isSelected = s.omitBoilerplate
         hideCommentsCheckBox.isSelected = s.hideCommentsByDefault
         runOnSaveCheckBox.isSelected = s.runOnSave
