@@ -12,7 +12,7 @@ import com.intellij.lang.annotation.ExternalAnnotator
 import com.intellij.lang.annotation.HighlightSeverity
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.fileEditor.FileDocumentManager
-import com.intellij.openapi.project.ProjectManager
+import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.TextRange
 import com.intellij.psi.PsiDocumentManager
 import com.intellij.psi.PsiFile
@@ -26,6 +26,7 @@ data class AnnotatorFileInfo(
     val projectDir: String,
     val fileStamp: Long,
     val configHash: Int,
+    val project: Project,
 )
 
 /**
@@ -61,6 +62,7 @@ class DocscribeAnnotator : ExternalAnnotator<AnnotatorFileInfo, DocscribeOutput>
             projectDir = projectDir,
             fileStamp = vFile.modificationStamp,
             configHash = configHash,
+            project = file.project,
         )
     }
 
@@ -83,6 +85,7 @@ class DocscribeAnnotator : ExternalAnnotator<AnnotatorFileInfo, DocscribeOutput>
             projectDir = projectDir,
             fileStamp = vFile.modificationStamp,
             configHash = configHash,
+            project = file.project,
         )
     }
 
@@ -94,18 +97,8 @@ class DocscribeAnnotator : ExternalAnnotator<AnnotatorFileInfo, DocscribeOutput>
         }
 
         val settings = DocscribeSettings.getInstance()
-        val useDaemon = settings.useDaemon
-        val project =
-            if (useDaemon) {
-                ProjectManager.getInstance().openProjects.find { p ->
-                    p.basePath != null && info.projectDir.startsWith(p.basePath!!)
-                }
-            } else {
-                null
-            }
-
         val result =
-            if (project != null) {
+            if (settings.useDaemon) {
                 val options =
                     RunOptions(
                         projectDir = info.projectDir,
@@ -113,7 +106,7 @@ class DocscribeAnnotator : ExternalAnnotator<AnnotatorFileInfo, DocscribeOutput>
                         strategy = DocscribeStrategy.CHECK,
                         formatJson = true,
                     )
-                DocscribeDaemon.executeWithFallback(project, options, settings)
+                DocscribeDaemon.executeWithFallback(info.project, options, settings)
             } else {
                 val projectRoot = DocscribeRunner.findProjectRoot(info.filePath) ?: return null
                 val options =

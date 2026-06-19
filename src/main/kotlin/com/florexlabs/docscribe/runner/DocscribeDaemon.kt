@@ -18,6 +18,7 @@ import java.util.concurrent.CompletableFuture
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
 import java.util.concurrent.atomic.AtomicInteger
+import kotlin.concurrent.thread
 
 /**
  * JSON response from the docscribe daemon process.
@@ -133,18 +134,34 @@ class DocscribeDaemon(
 
     private fun ensureRunning(projectDir: String?) {
         if (alive) return
-        val dir = projectDir ?: project.basePath ?: return
+        val gemRoot =
+            projectDir?.let { DocscribeRunner.findProjectRoot(it) }
+                ?: project.basePath?.let { DocscribeRunner.findProjectRoot(it) }
+                ?: return
         try {
             val wrapperPath = extractWrapper()
-            val cmd = buildStartCommand(wrapperPath)
+            val cmd = listOf("bundle", "exec", "ruby", wrapperPath)
 
             val pb =
                 ProcessBuilder(cmd)
-                    .directory(File(dir))
+                    .directory(File(gemRoot))
                     .redirectErrorStream(false)
             process = pb.start()
             writer = java.io.BufferedWriter(OutputStreamWriter(process!!.outputStream))
             reader = BufferedReader(InputStreamReader(process!!.inputStream))
+
+            // Drain stderr in a background thread to prevent buffer deadlock
+            val errReader = BufferedReader(InputStreamReader(process!!.errorStream))
+            thread(isDaemon = true) {
+                try {
+                    var line = errReader.readLine()
+                    while (line != null) {
+                        if (line.isNotBlank()) log.warn("Daemon stderr: $line")
+                        line = errReader.readLine()
+                    }
+                } catch (_: Exception) {
+                }
+            }
 
             val pong = sendPing()
             if (pong.exitCode != 0) {
@@ -152,20 +169,10 @@ class DocscribeDaemon(
                 return
             }
             alive = true
-            log.info("Docscribe daemon started (pid=${process!!.pid()})")
+            log.info("Docscribe daemon started (pid=${process!!.pid()}, gemRoot=$gemRoot)")
         } catch (e: Exception) {
             log.warn("Failed to start docscribe daemon", e)
             die()
-        }
-    }
-
-    private fun buildStartCommand(wrapperPath: String): List<String> {
-        val settings = DocscribeSettings.getInstance()
-        return if (settings.useBundleExec) {
-            // bundle exec also needs the project dir for correct Gemfile resolution
-            listOf("bundle", "exec", "ruby", wrapperPath)
-        } else {
-            listOf("ruby", wrapperPath)
         }
     }
 
@@ -271,7 +278,10 @@ class DocscribeDaemon(
             return daemon.execute(
                 command = command,
                 file = options.file,
-                projectDir = options.projectDir,
+                projectDir =
+                    options.projectDir.let { d ->
+                        DocscribeRunner.findProjectRoot(d) ?: d
+                    },
                 formatJson = options.formatJson,
                 useRbs = settings.useRbs,
                 noBoilerplate = settings.omitBoilerplate,
