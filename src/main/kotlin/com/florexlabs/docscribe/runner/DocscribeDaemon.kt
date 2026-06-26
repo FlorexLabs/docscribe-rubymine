@@ -351,5 +351,50 @@ class DocscribeDaemon(
             wrapperFile = tmp
             return tmp.absolutePath
         }
+
+        fun buildCheckJson(filePath: String, changes: List<*>): String {
+            val gson = GsonBuilder().create()
+            val offenses =
+                changes.mapNotNull { change ->
+                    if (change is Map<*, *>) {
+                        val line = (change["line"] as? Number)?.toInt() ?: 1
+                        mapOf(
+                            "severity" to "convention",
+                            "cop_name" to "DocScribe/MissingDocumentation",
+                            "message" to "Missing YARD documentation",
+                            "corrected" to false,
+                            "correctable" to true,
+                            "location" to
+                                mapOf(
+                                    "start_line" to line,
+                                    "start_column" to 1,
+                                    "last_line" to line,
+                                    "last_column" to 1,
+                                ),
+                        )
+                    } else {
+                        null
+                    }
+                }
+            val output =
+                mapOf(
+                    "metadata" to mapOf("docscribe_version" to "1.5.1"),
+                    "files" to
+                        listOf(
+                            mapOf(
+                                "path" to filePath,
+                                "offenses" to offenses,
+                            ),
+                        ),
+                    "summary" to
+                        mapOf(
+                            "offense_count" to offenses.size,
+                            "target_file_count" to 1,
+                            "inspected_file_count" to 1,
+                            "error_count" to 0,
+                        ),
+                )
+            return gson.toJson(output)
+        }
     }
 }
