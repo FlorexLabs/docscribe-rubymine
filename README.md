@@ -59,7 +59,7 @@ documentation. Compatible with **docscribe >= 1.5.0**.
   manual descriptions)
 - **Update types from RBS** — refresh YARD docs from RBS signatures
 - **Collapsible YARD docs** — fold all YARD comment blocks automatically on file open (configurable in settings)
-- **Configurable** — hide comments by default, always omit boilerplate
+- **Configurable** — hide comments by default
 - **`.rake` support** — diagnostics and actions work on Rake files
 - **JSON output** — uses `docscribe --format json` for reliable diagnostics parsing
 
@@ -126,12 +126,9 @@ auto-generate documentation for that method.
 
 Navigate to **Settings -> Tools -> DocScribe**:
 
-| Setting                  | Description                                  | Default     |
-|--------------------------|----------------------------------------------|-------------|
-| Command path             | Path to the docscribe executable             | `docscribe` |
-| Use bundle exec          | Run via `bundle exec`                        | Off         |
-| Use RBS type signatures  | Enable RBS-based type inference              | Off         |
-| Hide comments by default | Auto-fold YARD comment blocks on file open | Off |
+| Setting                  | Description                                | Default |
+|--------------------------|--------------------------------------------|---------|
+| Hide comments by default | Auto-fold YARD comment blocks on file open | Off     |
 
 ## Development
 
