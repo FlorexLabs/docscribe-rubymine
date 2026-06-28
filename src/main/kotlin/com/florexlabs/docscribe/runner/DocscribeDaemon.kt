@@ -207,22 +207,32 @@ class DocscribeDaemon(
         if (sdk?.homePath != null) {
             val rubyPath = "${sdk.homePath}/bin/ruby"
             if (File(rubyPath).canExecute()) return rubyPath
-            log.warn("Ruby SDK configured but binary not found at $rubyPath, falling back to shell")
-        } else {
-            log.warn("No Ruby SDK configured, falling back to shell discovery")
+            log.warn("Ruby SDK configured but binary not found at $rubyPath, falling back to PATH")
         }
 
+        val rubyFromPath = findRubyOnPath()
+        if (rubyFromPath != null) return rubyFromPath
+
+        log.warn("No Ruby found on PATH or via SDK")
+        return null
+    }
+
+    private fun findRubyOnPath(): String? {
         return try {
-            val proc = ProcessBuilder("bash", "-lc", "which ruby").start()
+            val homeDir = System.getProperty("user.home")
+            val rbenvShims = "$homeDir/.rbenv/shims/ruby"
+            if (File(rbenvShims).canExecute()) return rbenvShims
+
+            val proc = ProcessBuilder("which", "ruby").start()
             val path =
                 proc.inputStream
                     .bufferedReader()
                     .readLine()
                     ?.trim()
-            proc.waitFor(5, TimeUnit.SECONDS)
+            proc.waitFor(3, TimeUnit.SECONDS)
             if (path != null && path.isNotBlank() && File(path).canExecute()) path else null
         } catch (e: Exception) {
-            log.warn("Failed to find Ruby via shell", e)
+            log.warn("Failed to find Ruby on PATH", e)
             null
         }
     }
