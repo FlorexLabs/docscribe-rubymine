@@ -270,9 +270,11 @@ class DocscribeDaemon(
         val env = pb.environment()
         val sdk = ProjectRootManager.getInstance(project).projectSdk
         if (sdk?.homePath != null) {
-            val sdkBin = File(sdk.homePath, "bin").absolutePath
-            val currentPath = env["PATH"] ?: ""
-            env["PATH"] = "$sdkBin${File.pathSeparator}$currentPath"
+            val sdkBin = File(ruby).parentFile?.absolutePath
+            if (sdkBin != null) {
+                val currentPath = env["PATH"] ?: ""
+                env["PATH"] = "$sdkBin${File.pathSeparator}$currentPath"
+            }
             env["BUNDLE_GEMFILE"] = File(gemRoot, "Gemfile").absolutePath
         }
 
@@ -342,8 +344,12 @@ class DocscribeDaemon(
      */
     private fun rubyCommand(): String? {
         val sdk = ProjectRootManager.getInstance(project).projectSdk
-        if (sdk?.homePath != null) {
-            val rubyPath = "${sdk.homePath}/bin/ruby"
+        val homePath = sdk?.homePath
+        if (homePath != null) {
+            if (homePath.endsWith("ruby") && File(homePath).canExecute()) {
+                return homePath
+            }
+            val rubyPath = "$homePath/bin/ruby"
             if (File(rubyPath).canExecute()) return rubyPath
             log.warn("Ruby SDK configured but binary not found at $rubyPath, falling back to PATH")
         }

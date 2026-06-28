@@ -69,16 +69,6 @@ class DocscribeRunnerTest {
     }
 
     @Test
-    fun `runDocscribe with no file uses no file arg`() {
-        val executor = RecordingExecutor()
-        DocscribeRunner.runDocscribe(
-            RunOptions(projectDir = "/project", strategy = DocscribeStrategy.CHECK, formatJson = true),
-            executor,
-        )
-        assertEquals(listOf("exec", "docscribe", "--format", "json"), executor.lastArgs)
-    }
-
-    @Test
     fun `runDocscribe defaults to DefaultCommandExecutor does not throw`() {
         val tempDir = createTempDirectory().toFile()
         try {
@@ -94,5 +84,15 @@ class DocscribeRunnerTest {
         } finally {
             tempDir.deleteRecursively()
         }
+    }
+
+    @Test
+    fun `runDocscribe with no file uses no file arg`() {
+        val executor = RecordingExecutor()
+        DocscribeRunner.runDocscribe(
+            RunOptions(projectDir = "/project", strategy = DocscribeStrategy.CHECK, formatJson = true),
+            executor,
+        )
+        assertEquals(listOf("exec", "docscribe", "--format", "json"), executor.lastArgs)
     }
 }

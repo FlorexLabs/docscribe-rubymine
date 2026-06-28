@@ -19,7 +19,30 @@
     ]]></description>
 
   <change-notes><![CDATA[
-        Initial release.
+        <h3>0.1.4</h3>
+        <h4>Fixed</h4>
+        <ul>
+            <li>RPC protocol deadlock — JSON-RPC requests now include trailing newline and EOF signal</li>
+            <li>Exit code semantics — all fix actions check <code>exitCode != 0</code> instead of <code>&gt;= 2</code></li>
+            <li>VFS refresh in intention actions — ensures external file changes are detected</li>
+            <li>Folding builder never loaded — <code>language="Ruby"</code> &rarr; <code>language="ruby"</code></li>
+            <li>Folding regions silently dropped — added <code>order="first"</code></li>
+            <li>CI test failures — added Ruby setup, docscribe gem, bundler-cache</li>
+        </ul>
+        <h4>Added</h4>
+        <ul>
+            <li>Daemon mode — persistent Ruby server over Unix socket JSON-RPC 2.0</li>
+            <li><code>hideCommentsByDefault</code> reactivity — folding rebuilds on setting toggle</li>
+            <li>Full KDoc documentation on all 17 main source files</li>
+            <li>45 new tests (117 total)</li>
+        </ul>
+        <h4>Changed</h4>
+        <ul>
+            <li>Removed 5 dead settings (<code>commandPath</code>, <code>useBundleExec</code>, <code>runOnSave</code>, <code>useRbs</code>, <code>useDaemon</code>)</li>
+            <li>Settings page reduced to a single checkbox</li>
+            <li>Always passes <code>-B</code> flag in safe/aggressive modes</li>
+            <li>Daemon always-on — no toggle</li>
+        </ul>
     ]]></change-notes>
 
   <version>0.1.4</version>
