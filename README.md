@@ -27,7 +27,7 @@
 
 **DocScribe** is a RubyMine plugin that auto-generates inline YARD documentation for Ruby methods
 using [docscribe](https://github.com/unurgunite/docscribe) — a Ruby gem that analyzes AST and suggests YARD-compatible
-documentation. Compatible with **docscribe >= 1.5.0**.
+documentation. Compatible with **docscribe >= 1.4.0** (daemon mode requires >= 1.5.0).
 
 > Also, available for [VS Code](https://github.com/FlorexLabs/docscribe-vscode) on
 > the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=FlorexLabs.docscribe).
@@ -66,8 +66,18 @@ documentation. Compatible with **docscribe >= 1.5.0**.
 ## Requirements
 
 - **RubyMine 2026.1+** (also works in IntelliJ IDEA with Ruby plugin)
-- **Ruby** (>= 3.0) with Bundler
-- **docscribe gem** >= 1.5.0
+- **Ruby** with Bundler
+- **docscribe gem** >= 1.4.0
+
+### Version compatibility
+
+| Mode                     | docscribe version | Ruby version |
+|--------------------------|-------------------|--------------|
+| Daemon (Unix socket RPC) | >= 1.5.0          | >= 3.0       |
+| CLI fallback             | >= 1.4.0          | >= 2.7       |
+
+The plugin prefers daemon mode for better performance. If `docscribe < 1.5.0` or the Ruby SDK is unavailable, it
+automatically falls back to spawning the CLI directly.
 
 ```bash
 gem install docscribe

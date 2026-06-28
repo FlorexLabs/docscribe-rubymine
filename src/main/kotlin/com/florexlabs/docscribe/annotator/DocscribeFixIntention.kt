@@ -37,7 +37,7 @@ class DocscribeFixIntention : IntentionAction {
         project: Project,
         editor: Editor?,
         file: PsiFile?,
-    ): Boolean = file != null && file.name.endsWith(".rb")
+    ): Boolean = file != null && (file.name.endsWith(".rb") || file.name.endsWith(".rake"))
 
     /**
      * Save the editor, find the project root, and run docscribe safe fix in a background task.

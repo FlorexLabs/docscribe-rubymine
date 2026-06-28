@@ -21,6 +21,26 @@ jobs:
           java-version: 21
           distribution: temurin
 
+      - name: Setup Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.4'
+          bundler-cache: true
+
+      - name: Install docscribe gem
+        run: |
+          GEM_REPO="https://github.com/unurgunite/docscribe.git"
+          REF=$(git ls-remote --heads "$GEM_REPO" 'v*.*.*' | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+' | sort -V | tail -1 || true)
+          if [ -z "$REF" ]; then
+            REF=$(git ls-remote --heads "$GEM_REPO" master | head -1 | awk '{print $2}' | sed 's|refs/heads/||')
+          fi
+          if [ -n "$REF" ]; then
+            git clone --branch "$REF" --depth 1 "$GEM_REPO" /tmp/docscribe
+            cd /tmp/docscribe && gem build docscribe.gemspec && gem install docscribe-*.gem
+          else
+            gem install docscribe
+          fi
+
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
 
