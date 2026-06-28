@@ -16,7 +16,12 @@ class BuildCheckJsonTest {
         val output = parse(json)
         assertNotNull(output)
         assertEquals("test.rb", output!!.files.single().path)
-        assertTrue(output.files.single().offenses.isEmpty())
+        assertTrue(
+            output.files
+                .single()
+                .offenses
+                .isEmpty(),
+        )
         assertEquals(0, output.summary?.offenseCount)
         assertEquals(1, output.summary?.inspectedFileCount)
     }
@@ -35,8 +40,19 @@ class BuildCheckJsonTest {
         val output = parse(json)
         assertNotNull(output)
         assertEquals("app/models/user.rb", output!!.files.single().path)
-        assertEquals(1, output.files.single().offenses.size)
-        assertEquals(42, output.files.single().offenses[0].location.startLine)
+        assertEquals(
+            1,
+            output.files
+                .single()
+                .offenses.size,
+        )
+        assertEquals(
+            42,
+            output.files
+                .single()
+                .offenses[0]
+                .location.startLine,
+        )
         assertEquals(1, output.summary?.offenseCount)
     }
 
@@ -51,8 +67,18 @@ class BuildCheckJsonTest {
         val json = DocscribeDaemon.buildCheckJson("lib/helper.rb", changes)
         val output = parse(json)
         assertNotNull(output)
-        assertEquals(3, output!!.files.single().offenses.size)
-        val lines = output.files.single().offenses.map { it.location.startLine }
+        assertEquals(
+            3,
+            output!!
+                .files
+                .single()
+                .offenses.size,
+        )
+        val lines =
+            output.files
+                .single()
+                .offenses
+                .map { it.location.startLine }
         assertEquals(listOf(10, 20, 30), lines)
         assertEquals(3, output.summary?.offenseCount)
     }
@@ -63,8 +89,20 @@ class BuildCheckJsonTest {
         val json = DocscribeDaemon.buildCheckJson("test.rb", changes)
         val output = parse(json)
         assertNotNull(output)
-        assertEquals(1, output!!.files.single().offenses.size)
-        assertEquals(1, output.files.single().offenses[0].location.startLine)
+        assertEquals(
+            1,
+            output!!
+                .files
+                .single()
+                .offenses.size,
+        )
+        assertEquals(
+            1,
+            output.files
+                .single()
+                .offenses[0]
+                .location.startLine,
+        )
     }
 
     @Test
@@ -73,8 +111,20 @@ class BuildCheckJsonTest {
         val json = DocscribeDaemon.buildCheckJson("test.rb", changes)
         val output = parse(json)
         assertNotNull(output)
-        assertEquals(1, output!!.files.single().offenses.size)
-        assertEquals(7, output.files.single().offenses[0].location.startLine)
+        assertEquals(
+            1,
+            output!!
+                .files
+                .single()
+                .offenses.size,
+        )
+        assertEquals(
+            7,
+            output.files
+                .single()
+                .offenses[0]
+                .location.startLine,
+        )
     }
 
     @Test

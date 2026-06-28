@@ -352,7 +352,10 @@ class DocscribeDaemon(
             return tmp.absolutePath
         }
 
-        fun buildCheckJson(filePath: String, changes: List<*>): String {
+        fun buildCheckJson(
+            filePath: String,
+            changes: List<*>,
+        ): String {
             val gson = GsonBuilder().create()
             val offenses =
                 changes.mapNotNull { change ->
