@@ -15,21 +15,27 @@ import com.intellij.util.xmlb.XmlSerializerUtil
 @State(name = "DocscribeSettings", storages = [Storage("docscribe-settings.xml")])
 @Service
 class DocscribeSettings : PersistentStateComponent<DocscribeSettings> {
-    var commandPath: String = "docscribe"
-    var useBundleExec: Boolean = false
-    var runOnSave: Boolean = true
-    var useRbs: Boolean = false
-    var omitBoilerplate: Boolean = true
+    /**
+     * Whether YARD comment blocks should be folded (collapsed) by default in the editor.
+     */
     var hideCommentsByDefault: Boolean = false
-    var useDaemon: Boolean = true
 
+    /**
+     * Return this instance as the state to persist.
+     */
     override fun getState(): DocscribeSettings = this
 
+    /**
+     * Restore persisted settings into this instance.
+     */
     override fun loadState(state: DocscribeSettings) {
         XmlSerializerUtil.copyBean(state, this)
     }
 
     companion object {
+        /**
+         * Get the application-level [DocscribeSettings] singleton.
+         */
         @JvmStatic
         fun getInstance(): DocscribeSettings = ApplicationManager.getApplication().getService(DocscribeSettings::class.java)
     }

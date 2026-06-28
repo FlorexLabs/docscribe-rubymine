@@ -63,6 +63,9 @@ class DocscribeAnnotatorCache {
     }
 
     companion object {
+        /**
+         * Get the application-level [DocscribeAnnotatorCache] singleton.
+         */
         @JvmStatic
         fun getInstance(): DocscribeAnnotatorCache = ApplicationManager.getApplication().getService(DocscribeAnnotatorCache::class.java)
     }

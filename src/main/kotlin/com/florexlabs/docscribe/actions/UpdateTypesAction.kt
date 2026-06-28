@@ -11,6 +11,7 @@ import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.progress.ProgressIndicator
 import com.intellij.openapi.progress.Task
 import com.intellij.openapi.project.Project
+import java.io.File
 
 /**
  * Run `docscribe update_types` to refresh YARD documentation from RBS signatures.
@@ -18,6 +19,10 @@ import com.intellij.openapi.project.Project
  * Only visible when the project's Gemfile contains the `rbs` gem.
  */
 class UpdateTypesAction : AnAction() {
+    /**
+     * Find the project root, check that the Gemfile contains `rbs`, and run
+     * `docscribe update_types` in a background task. Show a notification on completion.
+     */
     override fun actionPerformed(e: AnActionEvent) {
         val project = e.project ?: return
         val projectDir = project.basePath ?: return
@@ -26,7 +31,7 @@ class UpdateTypesAction : AnAction() {
                 notify(project, "No Gemfile found in project tree", NotificationType.ERROR)
                 return
             }
-        if (!DocscribeRunner.gemfileHasRbs("$projectRoot/Gemfile")) {
+        if (!gemfileHasRbs("$projectRoot/Gemfile")) {
             notify(project, "RBS not found in Gemfile — update_types requires RBS", NotificationType.WARNING)
             return
         }
@@ -70,11 +75,21 @@ class UpdateTypesAction : AnAction() {
             e.presentation.isEnabledAndVisible = false
             return
         }
-        e.presentation.isEnabledAndVisible = DocscribeRunner.gemfileHasRbs("$projectRoot/Gemfile")
+        e.presentation.isEnabledAndVisible = gemfileHasRbs("$projectRoot/Gemfile")
     }
 
+    /**
+     * Always use a background thread for update checks.
+     */
     override fun getActionUpdateThread() = ActionUpdateThread.BGT
 
+    /**
+     * Show a DocScribe notification balloon.
+     *
+     * @param project The project to show the notification in.
+     * @param content The notification message text.
+     * @param type    The notification severity.
+     */
     private fun notify(
         project: Project,
         content: String,
@@ -83,4 +98,18 @@ class UpdateTypesAction : AnAction() {
         val group = NotificationGroupManager.getInstance().getNotificationGroup("DocScribe")
         group.createNotification(content, type).notify(project)
     }
+
+    /**
+     * Check whether the Gemfile at [gemfilePath] contains the `rbs` gem.
+     *
+     * @param gemfilePath Absolute path to the Gemfile.
+     * @return `true` if `gem "rbs"` is declared in the Gemfile.
+     */
+    private fun gemfileHasRbs(gemfilePath: String): Boolean =
+        try {
+            val content = File(gemfilePath).readText()
+            Regex("""gem\s+['"]rbs['"]""").containsMatchIn(content)
+        } catch (_: Exception) {
+            false
+        }
 }

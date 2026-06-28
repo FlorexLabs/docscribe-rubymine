@@ -12,7 +12,7 @@
     <img src="https://img.shields.io/jetbrains/plugin/d/32349-docscribe?color=green&label=Downloads" alt="Downloads">
   </a>
   <a href="https://github.com/FlorexLabs/docscribe-rubymine/actions/workflows/ci.yml">
-    <img src="https://img.shields.io/github/actions/workflow/status/FlorexLabs/docscribe-rubymine/ci.yml?branch=v0.1.0&label=CI" alt="CI">
+    <img src="https://img.shields.io/github/actions/workflow/status/FlorexLabs/docscribe-rubymine/ci.yml?branch=master&label=CI" alt="CI">
   </a>
   <a href="LICENSE">
     <img src="https://img.shields.io/github/license/FlorexLabs/docscribe-rubymine" alt="License">
@@ -48,6 +48,8 @@ documentation. Compatible with **docscribe >= 1.5.0**.
 
 ## Features
 
+- **Fast daemon mode** — persistent Ruby server via Unix socket JSON-RPC, eliminating CLI startup overhead on repeated
+  operations
 - **Inline diagnostics** — undocumented methods highlighted in the editor on file open and save
 - **Quick-fix intention** — lightbulb action to generate YARD documentation with one click
 - **RBS type inference** — uses RBS signatures for accurate `@param` and `@return` types (when `gem "rbs"` is in your
@@ -57,7 +59,7 @@ documentation. Compatible with **docscribe >= 1.5.0**.
   manual descriptions)
 - **Update types from RBS** — refresh YARD docs from RBS signatures
 - **Collapsible YARD docs** — fold all YARD comment blocks automatically on file open (configurable in settings)
-- **Configurable** — bundle exec, custom command path, run on save, RBS toggle, omit boilerplate, hide comments
+- **Configurable** — hide comments by default
 - **`.rake` support** — diagnostics and actions work on Rake files
 - **JSON output** — uses `docscribe --format json` for reliable diagnostics parsing
 
@@ -124,14 +126,9 @@ auto-generate documentation for that method.
 
 Navigate to **Settings -> Tools -> DocScribe**:
 
-| Setting                  | Description                                  | Default     |
-|--------------------------|----------------------------------------------|-------------|
-| Command path             | Path to the docscribe executable             | `docscribe` |
-| Use bundle exec          | Run via `bundle exec`                        | Off         |
-| Use RBS type signatures  | Enable RBS-based type inference              | Off         |
-| Omit boilerplate text    | Skip boilerplate in generated docs           | On          |
-| Hide comments by default | Auto-fold YARD comment blocks on file open   | Off         |
-| Run on save              | Automatically check file diagnostics on save | On          |
+| Setting                  | Description                                | Default |
+|--------------------------|--------------------------------------------|---------|
+| Hide comments by default | Auto-fold YARD comment blocks on file open | Off     |
 
 ## Development
 
@@ -157,11 +154,12 @@ Output: `build/distributions/docscribe-rubymine-*.zip`
 ## Architecture
 
 - **docscribe-rubymine** — IntelliJ Platform plugin (Kotlin)
-- **docscribe** — Ruby gem (CLI) — [GitHub](https://github.com/unurgunite/docscribe)
+- **docscribe** — Ruby gem (gem + CLI) — [GitHub](https://github.com/unurgunite/docscribe)
 
-The plugin wraps the `docscribe` CLI via `GeneralCommandLine`/`CapturingProcessHandler` and parses its JSON
-(RuboCop-compatible) output for inline diagnostics. Fixes are applied by running `docscribe` with `-a` (safe) or
-`-A` (aggressive) flags.
+The plugin runs a persistent Ruby daemon (`Docscribe::Server`) over a Unix domain socket using JSON-RPC 2.0 for
+all check/fix operations. If the daemon is unavailable, it falls back to spawning the `docscribe` CLI directly
+via `GeneralCommandLine`/`CapturingProcessHandler`. Output is parsed from the RuboCop-compatible JSON format
+for inline diagnostics.
 
 ## License
 

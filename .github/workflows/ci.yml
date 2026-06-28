@@ -2,7 +2,7 @@ name: CI
 
 on:
   pull_request:
-    branches: [v*.*.*, master]
+    branches: [ v*.*.*, master ]
 
 jobs:
   build:
@@ -17,6 +17,34 @@ jobs:
         with:
           java-version: 21
           distribution: temurin
+
+      - name: Setup Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.4'
+          bundler-cache: true
+
+      - name: Install docscribe gem
+        run: |
+          GEM_REPO="https://github.com/unurgunite/docscribe.git"
+          REF=""
+          if [ -n "$DOCSCRIBE_REF" ]; then
+            REF="$DOCSCRIBE_REF"
+          elif echo "${{ github.base_ref }}" | grep -qE '^v[0-9]+\.[0-9]+\.[0-9]+$' && \
+               git ls-remote --heads "$GEM_REPO" "${{ github.base_ref }}" | grep -q .; then
+            REF="${{ github.base_ref }}"
+          else
+            REF=$(git ls-remote --heads "$GEM_REPO" 'v*.*.*' | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+' | sort -V | tail -1 || true)
+          fi
+          if [ -z "$REF" ]; then
+            REF=$(git ls-remote --heads "$GEM_REPO" master | head -1 | awk '{print $2}' | sed 's|refs/heads/||')
+          fi
+          if [ -n "$REF" ]; then
+            git clone --branch "$REF" --depth 1 "$GEM_REPO" /tmp/docscribe
+            cd /tmp/docscribe && gem build docscribe.gemspec && gem install docscribe-*.gem
+          else
+            gem install docscribe
+          fi
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
@@ -55,6 +83,15 @@ jobs:
           else
             echo "⏭️ Skipping branch check: base branch is '$BASE_BRANCH' (not a version branch)"
           fi
+
+          PLUGIN_XML_VERSION=$(grep -oE '<version>[0-9]+\.[0-9]+\.[0-9]+</version>' \
+            src/main/resources/META-INF/plugin.xml | \
+            grep -oE '[0-9]+\.[0-9]+\.[0-9]+')
+          if [ "$PLUGIN_XML_VERSION" != "$PROP_VERSION" ]; then
+            echo "❌ plugin.xml version mismatch: says $PLUGIN_XML_VERSION, gradle.properties says $PROP_VERSION"
+            exit 1
+          fi
+          echo "✅ plugin.xml = $PLUGIN_XML_VERSION"
           echo "✅ All version checks passed"
 
       - name: Check formatting

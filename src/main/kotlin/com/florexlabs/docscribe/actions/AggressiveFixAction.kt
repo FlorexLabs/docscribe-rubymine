@@ -21,6 +21,10 @@ import com.intellij.openapi.project.Project
  * Preserves existing manual descriptions via the `-k` flag.
  */
 class AggressiveFixAction : AnAction() {
+    /**
+     * Save the editor, find the project root, and run `docscribe -A -k -B` in a background task.
+     * On success, refresh the file from disk.
+     */
     override fun actionPerformed(e: AnActionEvent) {
         val project = e.project ?: return
         val vFile = e.getData(CommonDataKeys.VIRTUAL_FILE) ?: return
@@ -48,13 +52,14 @@ class AggressiveFixAction : AnAction() {
                         formatJson = false,
                     )
                 val result = DocscribeDaemon.executeWithFallback(project, options)
-                failed = result.exitCode >= 2
+                failed = result.exitCode != 0
             }
 
             override fun onSuccess() {
                 if (failed) {
                     notify(project, "DocScribe: error applying aggressive fix", NotificationType.ERROR)
                 } else {
+                    vFile.refresh(false, false)
                     FileDocumentManager.getInstance().reloadFiles(vFile)
                     notify(project, "DocScribe: aggressive fix applied", NotificationType.INFORMATION)
                 }
@@ -62,13 +67,26 @@ class AggressiveFixAction : AnAction() {
         }.queue()
     }
 
+    /**
+     * Enable the action only when a `.rb` file is selected.
+     */
     override fun update(e: AnActionEvent) {
         val file = e.getData(CommonDataKeys.VIRTUAL_FILE)
         e.presentation.isEnabledAndVisible = file != null && file.name.endsWith(".rb")
     }
 
+    /**
+     * Always use a background thread for update checks.
+     */
     override fun getActionUpdateThread() = ActionUpdateThread.BGT
 
+    /**
+     * Show a DocScribe notification balloon.
+     *
+     * @param project The project to show the notification in.
+     * @param content The notification message text.
+     * @param type    The notification severity.
+     */
     private fun notify(
         project: Project,
         content: String,

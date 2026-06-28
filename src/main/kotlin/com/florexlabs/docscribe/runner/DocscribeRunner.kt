@@ -1,13 +1,16 @@
 package com.florexlabs.docscribe.runner
 
-import com.florexlabs.docscribe.settings.DocscribeSettings
 import com.intellij.execution.ExecutionException
 import com.intellij.execution.configurations.GeneralCommandLine
 import com.intellij.execution.process.CapturingProcessHandler
 import java.io.File
 
 /**
- * The docscribe strategy type: check for diagnostics, or apply safe/aggressive fixes.
+ * The strategy determines which docscribe CLI flags are used.
+ *
+ * - [CHECK] — dry-run, reports missing documentation.
+ * - [SAFE] — add missing `@param` / `@return` tags (`-a -B`).
+ * - [AGGRESSIVE] — generate full YARD documentation (`-A -k -B`).
  */
 enum class DocscribeStrategy {
     CHECK,
@@ -16,13 +19,13 @@ enum class DocscribeStrategy {
 }
 
 /**
- * Options passed to [DocscribeRunner.runDocscribe].
+ * Input parameters for a single docscribe invocation.
  *
- * @property projectDir  Absolute path to the project root (containing Gemfile).
- * @property file        Specific Ruby file to check/fix, or `null` for all files.
- * @property strategy    Which docscribe strategy to use.
- * @property formatJson  Whether to request JSON output (only used for CHECK).
- * @property subcommand  Optional subcommand (e.g. `"update_types"`) — when set, [strategy] is ignored.
+ * @property projectDir  Absolute path to the project root (must contain a `Gemfile`).
+ * @property file        Path to a specific Ruby file to target, or `null` for workspace-wide.
+ * @property strategy    Which fix strategy to apply; defaults to [DocscribeStrategy.CHECK].
+ * @property formatJson  Whether to pass `--format json` (only meaningful for [DocscribeStrategy.CHECK]).
+ * @property subcommand  Optional subcommand like `"update_types"` — takes priority over [strategy].
  */
 data class RunOptions(
     val projectDir: String,
@@ -33,13 +36,13 @@ data class RunOptions(
 )
 
 /**
- * Result of a docscribe command execution.
+ * The structured result of a docscribe execution.
  *
- * @property success   `true` when exit code is *not* 2 (fatal error).
- * @property hasIssues `true` when exit code is 1 (findings reported).
- * @property exitCode  Raw process exit code (0 = OK, 1 = findings, 2 = error).
- * @property stdout    Standard output text.
- * @property stderr    Standard error text.
+ * @property success   `true` when the process completed without errors (exit code != 2).
+ * @property hasIssues `true` when docscribe found documentation issues (exit code == 1).
+ * @property exitCode  Raw process exit code.
+ * @property stdout    Standard output from the process.
+ * @property stderr    Standard error from the process.
  */
 data class RunResult(
     val success: Boolean,
@@ -48,14 +51,26 @@ data class RunResult(
     val stdout: String,
     val stderr: String,
 ) {
+    /**
+     * Combined output: prefers `stdout`, falls back to `stderr` if `stdout` is blank.
+     */
     @Suppress("unused")
     val output: String get() = if (stderr.isBlank()) stdout else "$stdout\n$stderr"
 }
 
 /**
- * Abstraction over process execution for testability.
+ * Pluggable strategy for running external processes.
+ *
+ * Used in tests to avoid actually spawning a process.
  */
 interface CommandExecutor {
+    /**
+     * Execute a command and return the result.
+     *
+     * @param cmd  The executable to run (e.g. `"bundle"`).
+     * @param args Arguments to pass to the executable.
+     * @param cwd  Working directory for the process.
+     */
     fun execute(
         cmd: String,
         args: List<String>,
@@ -64,7 +79,9 @@ interface CommandExecutor {
 }
 
 /**
- * Default [CommandExecutor] that spawns a real OS process via [GeneralCommandLine].
+ * Default [CommandExecutor] that uses IntelliJ's [GeneralCommandLine] and [CapturingProcessHandler].
+ *
+ * Applies a 120-second timeout. Exit code 2 is treated as a failure (indistinguishable from timeout).
  */
 class DefaultCommandExecutor : CommandExecutor {
     override fun execute(
@@ -101,20 +118,24 @@ class DefaultCommandExecutor : CommandExecutor {
 }
 
 /**
- * Entry-point for running the docscribe CLI.
+ * Core runner for the docscribe CLI.
  *
- * All public methods are stateless; [findProjectRoot] traverses upward to locate the Gemfile,
- * [gemfileHasRbs] checks for the `rbs` gem dependency, and [getCommandArgs] builds the argument
- * list for the given strategy and options.
+ * Provides:
+ * - [findProjectRoot] — locate the project root by walking up for a `Gemfile`.
+ * - [getCommandArgs] — build CLI arguments from a [DocscribeStrategy].
+ * - [runDocscribe] — execute `bundle exec docscribe` with the given options.
  */
 object DocscribeRunner {
     private const val MAX_DEPTH = 20
 
     /**
-     * Walk up from [startPath] looking for a directory that contains a `Gemfile`.
+     * Walk up from [startPath] looking for a `Gemfile`.
      *
-     * @param startPath  Absolute path to start searching from.
-     * @return Absolute path of the directory containing `Gemfile`, or `null` if none found.
+     * Searches up to [MAX_DEPTH] levels. Returns the directory containing the `Gemfile`,
+     * or `null` if none is found.
+     *
+     * @param startPath The path to start searching from (typically a file within the project).
+     * @return Absolute path to the project root, or `null`.
      */
     fun findProjectRoot(startPath: String): String? {
         var current = File(startPath).canonicalFile
@@ -127,54 +148,38 @@ object DocscribeRunner {
     }
 
     /**
-     * Check whether a Gemfile contains a `gem "rbs"` declaration.
+     * Build the CLI argument list for `bundle exec docscribe <args>`.
      *
-     * @param gemfilePath  Absolute path to the Gemfile.
-     * @return `true` if the `rbs` gem is listed.
-     */
-    fun gemfileHasRbs(gemfilePath: String): Boolean =
-        try {
-            val content = File(gemfilePath).readText()
-            Regex("""gem\s+['"]rbs['"]""").containsMatchIn(content)
-        } catch (_: Exception) {
-            false
-        }
-
-    /**
-     * Build the CLI argument list for the docscribe command.
+     * Strategy-to-args mapping:
+     * - [DocscribeStrategy.CHECK] — no flags (unless [formatJson] adds `--format json`).
+     * - [DocscribeStrategy.SAFE] — `-a -B`.
+     * - [DocscribeStrategy.AGGRESSIVE] — `-A -k -B`.
      *
-     * @param strategy        Target strategy (CHECK, SAFE, AGGRESSIVE).
-     * @param formatJson      Request JSON output (only effective for CHECK).
-     * @param useRbs          Add `--rbs-collection` flag.
-     * @param filePath        Optional specific file path to scope the operation.
-     * @param omitBoilerplate Add `-B` flag for safe/aggressive modes.
+     * @param strategy   The fix strategy.
+     * @param formatJson Whether to include `--format json` (check-only).
+     * @param filePath   Optional specific file path to pass as the last argument.
+     * @return A list of CLI arguments.
      */
     fun getCommandArgs(
         strategy: DocscribeStrategy,
         formatJson: Boolean,
-        useRbs: Boolean,
         filePath: String? = null,
-        omitBoilerplate: Boolean = false,
     ): List<String> {
         val args = mutableListOf<String>()
         when (strategy) {
             DocscribeStrategy.SAFE -> {
                 args.add("-a")
-                if (omitBoilerplate) args.add("-B")
+                args.add("-B")
             }
 
             DocscribeStrategy.AGGRESSIVE -> {
-                args.addAll(listOf("-A", "-k"))
-                if (omitBoilerplate) args.add("-B")
+                args.addAll(listOf("-A", "-k", "-B"))
             }
 
             DocscribeStrategy.CHECK -> {}
         }
         if (formatJson && strategy == DocscribeStrategy.CHECK) {
             args.addAll(listOf("--format", "json"))
-        }
-        if (useRbs) {
-            args.add("--rbs-collection")
         }
         if (filePath != null) {
             args.add(filePath)
@@ -183,35 +188,27 @@ object DocscribeRunner {
     }
 
     /**
-     * Execute docscribe with the given options.
+     * Execute `bundle exec docscribe` with the given [options].
      *
-     * @param options   Run configuration (strategy, file, etc.).
-     * @param settings  Settings object (retrieved via singleton by default).
-     * @param executor  Process executor (defaults to real OS process).
+     * If [RunOptions.subcommand] is set it takes priority over [RunOptions.strategy],
+     * producing `bundle exec docscribe <subcommand> <projectDir>` instead of the normal
+     * strategy-based argument list.
+     *
+     * @param options  The run parameters.
+     * @param executor The process runner; defaults to [DefaultCommandExecutor].
+     * @return The [RunResult] from the execution.
      */
-    @Suppress("unused")
     fun runDocscribe(
         options: RunOptions,
-        settings: DocscribeSettings = DocscribeSettings.getInstance(),
         executor: CommandExecutor = DefaultCommandExecutor(),
     ): RunResult {
         val projectRoot = options.projectDir
-        val strategy = options.strategy
-        val formatJson = options.formatJson
-        val rbsEnabled = settings.useRbs
-        val useRbs = rbsEnabled && gemfileHasRbs("$projectRoot/Gemfile")
         val args =
             if (options.subcommand != null) {
                 listOf(options.subcommand, projectRoot)
             } else {
-                getCommandArgs(strategy, formatJson, useRbs, options.file, settings.omitBoilerplate)
+                getCommandArgs(options.strategy, options.formatJson, options.file)
             }
-        val useBundleExec = settings.useBundleExec
-        val commandPath = settings.commandPath
-        return if (useBundleExec) {
-            executor.execute("bundle", listOf("exec", commandPath) + args, projectRoot)
-        } else {
-            executor.execute(commandPath, args, projectRoot)
-        }
+        return executor.execute("bundle", listOf("exec", "docscribe") + args, projectRoot)
     }
 }
