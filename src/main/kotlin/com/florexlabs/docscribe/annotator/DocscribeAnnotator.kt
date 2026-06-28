@@ -5,7 +5,6 @@ import com.florexlabs.docscribe.runner.DocscribeOutput
 import com.florexlabs.docscribe.runner.DocscribeOutputParser
 import com.florexlabs.docscribe.runner.DocscribeStrategy
 import com.florexlabs.docscribe.runner.RunOptions
-import com.florexlabs.docscribe.settings.DocscribeSettings
 import com.intellij.lang.annotation.AnnotationHolder
 import com.intellij.lang.annotation.ExternalAnnotator
 import com.intellij.lang.annotation.HighlightSeverity
@@ -46,8 +45,7 @@ class DocscribeAnnotator : ExternalAnnotator<AnnotatorFileInfo, DocscribeOutput>
         // Skip unsaved documents — docscribe reads from disk, not from editor buffer
         if (FileDocumentManager.getInstance().isDocumentUnsaved(editor.document)) return null
 
-        val settings = DocscribeSettings.getInstance()
-        val configHash = settings.omitBoilerplate.hashCode()
+        val configHash = 0
 
         return AnnotatorFileInfo(
             filePath = vFile.path,
@@ -63,8 +61,7 @@ class DocscribeAnnotator : ExternalAnnotator<AnnotatorFileInfo, DocscribeOutput>
         val vFile = file.virtualFile ?: return null
         val projectDir = file.project.basePath ?: return null
 
-        val settings = DocscribeSettings.getInstance()
-        val configHash = settings.omitBoilerplate.hashCode()
+        val configHash = 0
 
         return AnnotatorFileInfo(
             filePath = vFile.path,

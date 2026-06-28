@@ -37,13 +37,13 @@ class GetCommandArgsTest {
     }
 
     @Test
-    fun `safe mode adds a flag`() {
+    fun `safe mode adds a and B flags`() {
         val args =
             DocscribeRunner.getCommandArgs(
                 strategy = DocscribeStrategy.SAFE,
                 formatJson = true,
             )
-        assertEquals(listOf("-a"), args)
+        assertEquals(listOf("-a", "-B"), args)
     }
 
     @Test
@@ -54,17 +54,17 @@ class GetCommandArgsTest {
                 formatJson = true,
                 filePath = "foo.rb",
             )
-        assertEquals(listOf("-a", "foo.rb"), args)
+        assertEquals(listOf("-a", "-B", "foo.rb"), args)
     }
 
     @Test
-    fun `aggressive mode adds A and k flags`() {
+    fun `aggressive mode adds A k and B flags`() {
         val args =
             DocscribeRunner.getCommandArgs(
                 strategy = DocscribeStrategy.AGGRESSIVE,
                 formatJson = false,
             )
-        assertEquals(listOf("-A", "-k"), args)
+        assertEquals(listOf("-A", "-k", "-B"), args)
     }
 
     @Test
@@ -75,50 +75,6 @@ class GetCommandArgsTest {
                 formatJson = true,
                 filePath = "lib/foo.rb",
             )
-        assertEquals(listOf("-A", "-k", "lib/foo.rb"), args)
-    }
-
-    @Test
-    fun `aggressive mode with boilerplate adds B flag`() {
-        val args =
-            DocscribeRunner.getCommandArgs(
-                strategy = DocscribeStrategy.AGGRESSIVE,
-                formatJson = false,
-                omitBoilerplate = true,
-            )
-        assertEquals(listOf("-A", "-k", "-B"), args)
-    }
-
-    @Test
-    fun `aggressive mode without boilerplate omits B flag`() {
-        val args =
-            DocscribeRunner.getCommandArgs(
-                strategy = DocscribeStrategy.AGGRESSIVE,
-                formatJson = false,
-                omitBoilerplate = false,
-            )
-        assertEquals(listOf("-A", "-k"), args)
-    }
-
-    @Test
-    fun `safe mode with boilerplate adds B flag`() {
-        val args =
-            DocscribeRunner.getCommandArgs(
-                strategy = DocscribeStrategy.SAFE,
-                formatJson = false,
-                omitBoilerplate = true,
-            )
-        assertEquals(listOf("-a", "-B"), args)
-    }
-
-    @Test
-    fun `safe mode without boilerplate omits B flag`() {
-        val args =
-            DocscribeRunner.getCommandArgs(
-                strategy = DocscribeStrategy.SAFE,
-                formatJson = false,
-                omitBoilerplate = false,
-            )
-        assertEquals(listOf("-a"), args)
+        assertEquals(listOf("-A", "-k", "-B", "lib/foo.rb"), args)
     }
 }

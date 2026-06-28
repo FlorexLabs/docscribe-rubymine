@@ -13,8 +13,6 @@ import javax.swing.JPanel
  * Binds Swing controls to [DocscribeSettings] fields.
  */
 class DocscribeSettingsConfigurable : Configurable {
-    @JvmField var omitBoilerplateCheckBox = JBCheckBox("Omit boilerplate text")
-
     @JvmField var hideCommentsCheckBox = JBCheckBox("Hide comments by default")
     private var panel: JPanel? = null
 
@@ -22,12 +20,10 @@ class DocscribeSettingsConfigurable : Configurable {
 
     override fun createComponent(): JComponent {
         val settings = DocscribeSettings.getInstance()
-        omitBoilerplateCheckBox.isSelected = settings.omitBoilerplate
         hideCommentsCheckBox.isSelected = settings.hideCommentsByDefault
         panel =
             FormBuilder
                 .createFormBuilder()
-                .addComponent(omitBoilerplateCheckBox)
                 .addComponent(hideCommentsCheckBox)
                 .addComponentFillVertically(JPanel(), 0)
                 .panel
@@ -36,13 +32,11 @@ class DocscribeSettingsConfigurable : Configurable {
 
     override fun isModified(): Boolean {
         val s = DocscribeSettings.getInstance()
-        return omitBoilerplateCheckBox.isSelected != s.omitBoilerplate ||
-            hideCommentsCheckBox.isSelected != s.hideCommentsByDefault
+        return hideCommentsCheckBox.isSelected != s.hideCommentsByDefault
     }
 
     override fun apply() {
         val s = DocscribeSettings.getInstance()
-        s.omitBoilerplate = omitBoilerplateCheckBox.isSelected
         s.hideCommentsByDefault = hideCommentsCheckBox.isSelected
         ApplicationManager
             .getApplication()
@@ -53,7 +47,6 @@ class DocscribeSettingsConfigurable : Configurable {
 
     override fun reset() {
         val s = DocscribeSettings.getInstance()
-        omitBoilerplateCheckBox.isSelected = s.omitBoilerplate
         hideCommentsCheckBox.isSelected = s.hideCommentsByDefault
     }
 }

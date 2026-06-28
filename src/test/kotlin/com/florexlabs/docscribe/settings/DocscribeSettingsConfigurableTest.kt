@@ -19,37 +19,11 @@ class DocscribeSettingsConfigurableTest : BasePlatformTestCase() {
         assertFalse(c.isModified)
     }
 
-    fun testIsModifiedAfterOmitBoilerplateToggle() {
-        val c = DocscribeSettingsConfigurable()
-        c.createComponent()
-        c.omitBoilerplateCheckBox.isSelected = !c.omitBoilerplateCheckBox.isSelected
-        assertTrue(c.isModified)
-    }
-
     fun testIsModifiedAfterHideCommentsToggle() {
         val c = DocscribeSettingsConfigurable()
         c.createComponent()
         c.hideCommentsCheckBox.isSelected = !c.hideCommentsCheckBox.isSelected
         assertTrue(c.isModified)
-    }
-
-    fun testIsModifiedFalseAfterApply() {
-        val c = DocscribeSettingsConfigurable()
-        c.createComponent()
-        c.omitBoilerplateCheckBox.isSelected = !c.omitBoilerplateCheckBox.isSelected
-        c.apply()
-        assertFalse(c.isModified)
-    }
-
-    fun testApplyPersistsOmitBoilerplate() {
-        val s = DocscribeSettings.getInstance()
-        val originalOmit = s.omitBoilerplate
-        val c = DocscribeSettingsConfigurable()
-        c.createComponent()
-        c.omitBoilerplateCheckBox.isSelected = false
-        c.apply()
-        assertFalse(s.omitBoilerplate)
-        s.omitBoilerplate = originalOmit
     }
 
     fun testApplyPersistsHideComments() {
@@ -61,17 +35,6 @@ class DocscribeSettingsConfigurableTest : BasePlatformTestCase() {
         c.apply()
         assertTrue(s.hideCommentsByDefault)
         s.hideCommentsByDefault = originalHide
-    }
-
-    fun testResetRestoresOmitBoilerplate() {
-        val s = DocscribeSettings.getInstance()
-        s.omitBoilerplate = false
-        val c = DocscribeSettingsConfigurable()
-        c.createComponent()
-        c.omitBoilerplateCheckBox.isSelected = true
-        c.reset()
-        assertFalse(c.omitBoilerplateCheckBox.isSelected)
-        s.omitBoilerplate = true
     }
 
     fun testResetRestoresHideComments() {

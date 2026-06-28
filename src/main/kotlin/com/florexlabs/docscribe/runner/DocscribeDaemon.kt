@@ -1,6 +1,5 @@
 package com.florexlabs.docscribe.runner
 
-import com.florexlabs.docscribe.settings.DocscribeSettings
 import com.google.gson.GsonBuilder
 import com.intellij.notification.NotificationGroupManager
 import com.intellij.notification.NotificationType
@@ -45,11 +44,10 @@ class DocscribeDaemon(
         file: String? = null,
         projectDir: String? = null,
         formatJson: Boolean = false,
-        noBoilerplate: Boolean = false,
     ): RunResult {
         synchronized(lock) {
             val handle = ensureRunning(projectDir) ?: return fallback(command, file, projectDir, formatJson)
-            val params = buildExecuteParams(file, projectDir, noBoilerplate)
+            val params = buildExecuteParams(file, projectDir)
             val response = performRpcCall(handle, command, params)
             return processRpcResponse(response, command, file, projectDir, formatJson)
         }
@@ -58,16 +56,12 @@ class DocscribeDaemon(
     private fun buildExecuteParams(
         file: String?,
         projectDir: String?,
-        noBoilerplate: Boolean,
-    ): Map<String, Any?> {
-        val params =
-            mutableMapOf<String, Any?>(
-                "file" to file,
-                "project_dir" to (projectDir ?: project.basePath ?: ""),
-            )
-        if (noBoilerplate) params["no_boilerplate"] = true
-        return params
-    }
+    ): Map<String, Any?> =
+        mutableMapOf<String, Any?>(
+            "file" to file,
+            "project_dir" to (projectDir ?: project.basePath ?: ""),
+            "no_boilerplate" to true,
+        )
 
     private fun performRpcCall(
         handle: ServerHandle,
@@ -425,7 +419,6 @@ class DocscribeDaemon(
             project: Project,
             options: RunOptions,
         ): RunResult {
-            val settings = DocscribeSettings.getInstance()
             val daemon = getInstance(project)
             val command =
                 when (options.subcommand) {
@@ -446,7 +439,6 @@ class DocscribeDaemon(
                 file = options.file,
                 projectDir = options.projectDir.let { d -> DocscribeRunner.findProjectRoot(d) ?: d },
                 formatJson = options.formatJson,
-                noBoilerplate = settings.omitBoilerplate,
             )
         }
     }

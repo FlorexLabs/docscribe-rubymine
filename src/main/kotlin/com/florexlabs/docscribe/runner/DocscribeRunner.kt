@@ -89,18 +89,16 @@ object DocscribeRunner {
         strategy: DocscribeStrategy,
         formatJson: Boolean,
         filePath: String? = null,
-        omitBoilerplate: Boolean = false,
     ): List<String> {
         val args = mutableListOf<String>()
         when (strategy) {
             DocscribeStrategy.SAFE -> {
                 args.add("-a")
-                if (omitBoilerplate) args.add("-B")
+                args.add("-B")
             }
 
             DocscribeStrategy.AGGRESSIVE -> {
-                args.addAll(listOf("-A", "-k"))
-                if (omitBoilerplate) args.add("-B")
+                args.addAll(listOf("-A", "-k", "-B"))
             }
 
             DocscribeStrategy.CHECK -> {}

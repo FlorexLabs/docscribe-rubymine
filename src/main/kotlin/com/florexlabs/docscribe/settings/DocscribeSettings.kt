@@ -15,7 +15,6 @@ import com.intellij.util.xmlb.XmlSerializerUtil
 @State(name = "DocscribeSettings", storages = [Storage("docscribe-settings.xml")])
 @Service
 class DocscribeSettings : PersistentStateComponent<DocscribeSettings> {
-    var omitBoilerplate: Boolean = true
     var hideCommentsByDefault: Boolean = false
 
     override fun getState(): DocscribeSettings = this

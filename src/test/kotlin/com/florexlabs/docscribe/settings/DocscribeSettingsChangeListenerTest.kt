@@ -28,27 +28,6 @@ class DocscribeSettingsChangeListenerTest : BasePlatformTestCase() {
             },
         )
 
-        configurable.omitBoilerplateCheckBox.isSelected = true
-        configurable.apply()
-
-        assertTrue(called)
-    }
-
-    fun testApplyPublishesAfterHideCommentsToggle() {
-        val configurable = DocscribeSettingsConfigurable()
-        configurable.createComponent()
-
-        var called = false
-        val connection = ApplicationManager.getApplication().messageBus.connect(testRootDisposable)
-        connection.subscribe(
-            DocscribeSettingsChangeListener.TOPIC,
-            object : DocscribeSettingsChangeListener {
-                override fun settingsChanged() {
-                    called = true
-                }
-            },
-        )
-
         configurable.hideCommentsCheckBox.isSelected = true
         configurable.apply()
 

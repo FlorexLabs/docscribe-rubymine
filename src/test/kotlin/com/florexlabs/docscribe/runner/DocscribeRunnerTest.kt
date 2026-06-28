@@ -36,25 +36,25 @@ class DocscribeRunnerTest {
     }
 
     @Test
-    fun `runDocscribe with safe strategy uses bundle exec docscribe -a`() {
+    fun `runDocscribe with safe strategy uses bundle exec docscribe -a -B`() {
         val executor = RecordingExecutor()
         DocscribeRunner.runDocscribe(
             RunOptions(projectDir = "/project", file = "test.rb", strategy = DocscribeStrategy.SAFE),
             executor,
         )
         assertEquals("bundle", executor.lastCommand)
-        assertEquals(listOf("exec", "docscribe", "-a", "test.rb"), executor.lastArgs)
+        assertEquals(listOf("exec", "docscribe", "-a", "-B", "test.rb"), executor.lastArgs)
     }
 
     @Test
-    fun `runDocscribe with aggressive strategy uses bundle exec docscribe -A -k`() {
+    fun `runDocscribe with aggressive strategy uses bundle exec docscribe -A -k -B`() {
         val executor = RecordingExecutor()
         DocscribeRunner.runDocscribe(
             RunOptions(projectDir = "/project", file = "test.rb", strategy = DocscribeStrategy.AGGRESSIVE),
             executor,
         )
         assertEquals("bundle", executor.lastCommand)
-        assertEquals(listOf("exec", "docscribe", "-A", "-k", "test.rb"), executor.lastArgs)
+        assertEquals(listOf("exec", "docscribe", "-A", "-k", "-B", "test.rb"), executor.lastArgs)
     }
 
     @Test
