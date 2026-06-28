@@ -16,17 +16,35 @@ import com.intellij.openapi.progress.Task
 import com.intellij.openapi.project.Project
 import com.intellij.psi.PsiFile
 
+/**
+ * Intention action (lightbulb) that runs docscribe **check** on the current Ruby file.
+ *
+ * Appears as "DocScribe: Check current file" in the Alt+Enter quick-fix menu.
+ * Runs docscribe in JSON mode and shows a notification with the result summary.
+ */
 class DocscribeCheckIntention : IntentionAction {
+    /**
+     * The display text shown in the Alt+Enter intention menu.
+     */
     override fun getText(): String = "DocScribe: Check current file"
 
+    /**
+     * The family name groups related intentions together in settings.
+     */
     override fun getFamilyName(): String = "DocScribe"
 
+    /**
+     * Available only for `.rb` files.
+     */
     override fun isAvailable(
         project: Project,
         editor: Editor?,
         file: PsiFile?,
     ): Boolean = file != null && file.name.endsWith(".rb")
 
+    /**
+     * Run docscribe check in a background task and show a notification on completion.
+     */
     override fun invoke(
         project: Project,
         editor: Editor?,
@@ -72,8 +90,17 @@ class DocscribeCheckIntention : IntentionAction {
         }.queue()
     }
 
+    /**
+     * This intention does not modify the PSI directly, so it runs outside a write action.
+     */
     override fun startInWriteAction(): Boolean = false
 
+    /**
+     * Build a human-readable summary string from the docscribe JSON output.
+     *
+     * @param result The run result from docscribe.
+     * @return A formatted summary string, e.g. "DocScribe: checked 1 file(s) — 2 issue(s) found".
+     */
     private fun buildSummary(result: RunResult): String {
         val parsed = DocscribeOutputParser.parseJson(result.stdout)
         if (parsed != null) {

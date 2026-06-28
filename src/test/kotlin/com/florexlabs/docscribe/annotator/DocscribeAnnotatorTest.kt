@@ -3,24 +3,30 @@ package com.florexlabs.docscribe.annotator
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 
 class DocscribeAnnotatorTest : BasePlatformTestCase() {
-    private val annotator = DocscribeAnnotator()
+    override fun getTestDataPath(): String = "src/test/kotlin/com/florexlabs/docscribe/fixtures"
 
-    fun testCollectInformationReturnsNullForNonRubyFile() {
-        val file = myFixture.configureByText("foo.txt", "plain text")
-        assertNull(annotator.collectInformation(file))
+    fun testAnnotatorReturnsNullForNonRubyFile() {
+        val file = myFixture.configureByText("test.txt", "some text")
+        val info = DocscribeAnnotator().collectInformation(file)
+        assertNull(info)
     }
 
-    fun testCollectInformationReturnsInfoForRubyFile() {
-        val file = myFixture.configureByText("test.rb", "class Foo; end")
-        val result = annotator.collectInformation(file)
-        assertNotNull(result)
-        assertTrue(result!!.filePath.endsWith("test.rb"))
+    fun testAnnotatorReturnsInfoForRubyFile() {
+        val file = myFixture.configureByText("test.rb", "class Foo\nend")
+        val info = DocscribeAnnotator().collectInformation(file)
+        assertNotNull(info)
     }
 
-    fun testCollectInformationReturnsNullForNullVirtualFile() {
-        val file = myFixture.configureByText("test.rb", "class Foo; end")
-        // Simulate no virtual file by inlining... only test that .rb passes the first check
-        val result = annotator.collectInformation(file)
-        assertNotNull(result)
+    fun testAnnotatorReturnsInfoForRakeFile() {
+        val file = myFixture.configureByText("Rakefile.rake", "task :test do\nend")
+        val info = DocscribeAnnotator().collectInformation(file)
+        assertNotNull(info)
+    }
+
+    fun testNoEditorOverloadReturnsInfo() {
+        val file = myFixture.configureByText("test.rb", "class Foo\nend")
+        val info = DocscribeAnnotator().collectInformation(file)
+        assertNotNull(info)
+        assertEquals("test.rb", info!!.filePath.substringAfterLast("/"))
     }
 }

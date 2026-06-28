@@ -19,46 +19,32 @@ class DocscribeSettingsConfigurableTest : BasePlatformTestCase() {
         assertFalse(c.isModified)
     }
 
-    fun testIsModifiedAfterFieldChange() {
+    fun testIsModifiedAfterHideCommentsToggle() {
         val c = DocscribeSettingsConfigurable()
         c.createComponent()
-        c.commandPathField.text = "/custom/path"
+        c.hideCommentsCheckBox.isSelected = !c.hideCommentsCheckBox.isSelected
         assertTrue(c.isModified)
     }
 
-    fun testIsModifiedFalseAfterApply() {
+    fun testApplyPersistsHideComments() {
+        val s = DocscribeSettings.getInstance()
+        val originalHide = s.hideCommentsByDefault
         val c = DocscribeSettingsConfigurable()
         c.createComponent()
-        c.commandPathField.text = "/custom/path"
+        c.hideCommentsCheckBox.isSelected = true
         c.apply()
-        assertFalse(c.isModified)
+        assertTrue(s.hideCommentsByDefault)
+        s.hideCommentsByDefault = originalHide
     }
 
-    fun testApplyPersistsChanges() {
+    fun testResetRestoresHideComments() {
         val s = DocscribeSettings.getInstance()
-        val originalPath = s.commandPath
+        s.hideCommentsByDefault = true
         val c = DocscribeSettingsConfigurable()
         c.createComponent()
-        c.commandPathField.text = "/custom/docscribe"
-        c.useBundleExecCheckBox.isSelected = true
-        c.omitBoilerplateCheckBox.isSelected = false
-        c.apply()
-        assertEquals("/custom/docscribe", s.commandPath)
-        assertTrue(s.useBundleExec)
-        assertFalse(s.omitBoilerplate)
-        s.commandPath = originalPath
-        s.useBundleExec = false
-        s.omitBoilerplate = true
-    }
-
-    fun testResetRestoresFromSettings() {
-        val s = DocscribeSettings.getInstance()
-        s.commandPath = "/tmp/docscribe"
-        val c = DocscribeSettingsConfigurable()
-        c.createComponent()
-        c.commandPathField.text = ""
+        c.hideCommentsCheckBox.isSelected = false
         c.reset()
-        assertEquals("/tmp/docscribe", c.commandPathField.text)
-        s.commandPath = "docscribe"
+        assertTrue(c.hideCommentsCheckBox.isSelected)
+        s.hideCommentsByDefault = false
     }
 }

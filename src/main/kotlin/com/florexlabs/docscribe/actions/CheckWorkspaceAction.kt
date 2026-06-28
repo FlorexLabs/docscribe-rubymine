@@ -20,6 +20,10 @@ import com.intellij.openapi.project.Project
  * Runs in background via [Task.Backgroundable]. Shows a summary notification when done.
  */
 class CheckWorkspaceAction : AnAction() {
+    /**
+     * Find the project root and run `docscribe --format json` across the entire workspace
+     * in a background task. Parse the JSON output and show a summary notification.
+     */
     override fun actionPerformed(e: AnActionEvent) {
         val project = e.project ?: return
         val projectDir = project.basePath ?: return
@@ -66,13 +70,26 @@ class CheckWorkspaceAction : AnAction() {
         }.queue()
     }
 
+    /**
+     * Enable the action only when a project is open.
+     */
     override fun update(e: AnActionEvent) {
         val project = e.project
         e.presentation.isEnabledAndVisible = project != null
     }
 
+    /**
+     * Always use a background thread for update checks.
+     */
     override fun getActionUpdateThread() = ActionUpdateThread.BGT
 
+    /**
+     * Show a DocScribe notification balloon.
+     *
+     * @param project The project to show the notification in.
+     * @param content The notification message text.
+     * @param type    The notification severity.
+     */
     private fun notify(
         project: Project,
         content: String,

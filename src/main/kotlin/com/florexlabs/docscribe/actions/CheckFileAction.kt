@@ -17,6 +17,12 @@ import com.intellij.openapi.progress.ProgressIndicator
 import com.intellij.openapi.progress.Task
 import com.intellij.openapi.project.Project
 
+/**
+ * Run docscribe **check** on the current Ruby file.
+ *
+ * Triggered via menu (Editor Popup -> DocScribe -> Check Current File) or keyboard shortcut
+ * (Ctrl+Shift+D, then C). Shows a notification with the check summary.
+ */
 class CheckFileAction : AnAction() {
     override fun actionPerformed(e: AnActionEvent) {
         val project = e.project ?: return
@@ -59,13 +65,25 @@ class CheckFileAction : AnAction() {
         }.queue()
     }
 
+    /**
+     * Enable the action only when a `.rb` file is selected.
+     */
     override fun update(e: AnActionEvent) {
         val file = e.getData(CommonDataKeys.VIRTUAL_FILE)
         e.presentation.isEnabledAndVisible = file != null && file.name.endsWith(".rb")
     }
 
+    /**
+     * Always use a background thread for update checks.
+     */
     override fun getActionUpdateThread() = ActionUpdateThread.BGT
 
+    /**
+     * Build a human-readable summary string from the docscribe JSON output.
+     *
+     * @param result The run result from docscribe.
+     * @return A formatted summary string, e.g. "DocScribe: checked 1 file(s) — 2 issue(s) found".
+     */
     private fun buildSummary(result: RunResult): String {
         val parsed = DocscribeOutputParser.parseJson(result.stdout)
         if (parsed != null) {
@@ -80,6 +98,13 @@ class CheckFileAction : AnAction() {
         return if (result.hasIssues) "DocScribe: issues found" else "DocScribe: OK"
     }
 
+    /**
+     * Show a DocScribe notification balloon.
+     *
+     * @param project The project to show the notification in.
+     * @param content The notification message text.
+     * @param type    The notification severity (ERROR, WARNING, INFORMATION).
+     */
     private fun notify(
         project: Project,
         content: String,
@@ -89,6 +114,12 @@ class CheckFileAction : AnAction() {
         group.createNotification(content, type).notify(project)
     }
 
+    /**
+     * Show an error notification.
+     *
+     * @param project The project to show the notification in.
+     * @param message The error message to display.
+     */
     private fun showError(
         project: Project,
         message: String,

@@ -22,7 +22,7 @@
         Initial release.
     ]]></change-notes>
 
-  <version>0.1.0</version>
+  <version>0.1.4</version>
   <idea-version since-build="261" until-build="261.*"/>
 
   <depends>com.intellij.modules.platform</depends>
@@ -31,6 +31,7 @@
   <extensions defaultExtensionNs="com.intellij">
     <applicationService serviceImplementation="com.florexlabs.docscribe.settings.DocscribeSettings"/>
     <applicationService serviceImplementation="com.florexlabs.docscribe.annotator.DocscribeAnnotatorCache"/>
+    <applicationService serviceImplementation="com.florexlabs.docscribe.settings.DocscribeSettingsChangeListenerImpl"/>
     <projectService serviceImplementation="com.florexlabs.docscribe.runner.DocscribeDaemon"/>
 
     <notificationGroup id="DocScribe" displayType="BALLOON" key="DocScribe notifications"/>
@@ -44,7 +45,7 @@
       id="com.florexlabs.docscribe.settings"
       instance="com.florexlabs.docscribe.settings.DocscribeSettingsConfigurable"/>
 
-    <lang.foldingBuilder language="Ruby"
+    <lang.foldingBuilder language="ruby" order="first"
                          implementationClass="com.florexlabs.docscribe.folding.YardFoldingBuilder"/>
 
     <dependencySupport kind="ruby" coordinate="docscribe" displayName="docscribe gem"/>
