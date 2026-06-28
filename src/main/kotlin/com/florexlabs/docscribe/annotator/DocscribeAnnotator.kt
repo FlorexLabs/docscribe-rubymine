@@ -33,6 +33,16 @@ data class AnnotatorFileInfo(
  * Skips unsaved documents (docscribe reads from disk) and caches results by file modification stamp.
  */
 class DocscribeAnnotator : ExternalAnnotator<AnnotatorFileInfo, DocscribeOutput>() {
+    /**
+     * Collect file information for annotation when an editor is available.
+     *
+     * Skips non-Ruby/Rake files and unsaved documents (docscribe reads from disk, not the editor buffer).
+     *
+     * @param file      The PSI file being annotated.
+     * @param editor    The editor for the file.
+     * @param hasErrors Whether the file already has parse errors.
+     * @return [AnnotatorFileInfo] if the file should be checked, or `null` to skip.
+     */
     override fun collectInformation(
         file: PsiFile,
         editor: Editor,
@@ -56,6 +66,14 @@ class DocscribeAnnotator : ExternalAnnotator<AnnotatorFileInfo, DocscribeOutput>
         )
     }
 
+    /**
+     * Collect file information for annotation when no editor is available (background re-annotation).
+     *
+     * Skips non-Ruby/Rake files.
+     *
+     * @param file The PSI file being annotated.
+     * @return [AnnotatorFileInfo] if the file should be checked, or `null` to skip.
+     */
     override fun collectInformation(file: PsiFile): AnnotatorFileInfo? {
         if (!file.name.endsWith(".rb") && !file.name.endsWith(".rake")) return null
         val vFile = file.virtualFile ?: return null
@@ -72,6 +90,12 @@ class DocscribeAnnotator : ExternalAnnotator<AnnotatorFileInfo, DocscribeOutput>
         )
     }
 
+    /**
+     * Run docscribe check on the collected file, using the cache if the file is unchanged.
+     *
+     * @param info The file information collected by [collectInformation].
+     * @return Parsed [DocscribeOutput], or `null` if the file has no issues or the check failed.
+     */
     override fun doAnnotate(info: AnnotatorFileInfo): DocscribeOutput? {
         val cache = DocscribeAnnotatorCache.getInstance()
         val cached = cache.get(info.projectDir, info.filePath, info.fileStamp, info.configHash)
@@ -100,6 +124,16 @@ class DocscribeAnnotator : ExternalAnnotator<AnnotatorFileInfo, DocscribeOutput>
         return if (output == null || output.files.isEmpty()) null else output
     }
 
+    /**
+     * Apply inline annotations (squigglies) based on the docscribe output.
+     *
+     * Maps each offense to a warning (or error for severity `"fatal"`) on the offending line,
+     * with a quick-fix attached via [DocscribeFixIntention].
+     *
+     * @param file             The PSI file being annotated.
+     * @param annotationResult The parsed docscribe output, or `null`.
+     * @param holder           The annotation holder to add annotations to.
+     */
     override fun apply(
         file: PsiFile,
         annotationResult: DocscribeOutput?,

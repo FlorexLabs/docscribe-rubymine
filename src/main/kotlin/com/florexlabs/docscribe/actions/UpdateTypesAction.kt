@@ -19,6 +19,10 @@ import java.io.File
  * Only visible when the project's Gemfile contains the `rbs` gem.
  */
 class UpdateTypesAction : AnAction() {
+    /**
+     * Find the project root, check that the Gemfile contains `rbs`, and run
+     * `docscribe update_types` in a background task. Show a notification on completion.
+     */
     override fun actionPerformed(e: AnActionEvent) {
         val project = e.project ?: return
         val projectDir = project.basePath ?: return
@@ -74,8 +78,18 @@ class UpdateTypesAction : AnAction() {
         e.presentation.isEnabledAndVisible = gemfileHasRbs("$projectRoot/Gemfile")
     }
 
+    /**
+     * Always use a background thread for update checks.
+     */
     override fun getActionUpdateThread() = ActionUpdateThread.BGT
 
+    /**
+     * Show a DocScribe notification balloon.
+     *
+     * @param project The project to show the notification in.
+     * @param content The notification message text.
+     * @param type    The notification severity.
+     */
     private fun notify(
         project: Project,
         content: String,
@@ -85,6 +99,12 @@ class UpdateTypesAction : AnAction() {
         group.createNotification(content, type).notify(project)
     }
 
+    /**
+     * Check whether the Gemfile at [gemfilePath] contains the `rbs` gem.
+     *
+     * @param gemfilePath Absolute path to the Gemfile.
+     * @return `true` if `gem "rbs"` is declared in the Gemfile.
+     */
     private fun gemfileHasRbs(gemfilePath: String): Boolean =
         try {
             val content = File(gemfilePath).readText()

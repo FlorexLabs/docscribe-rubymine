@@ -20,16 +20,29 @@ import com.intellij.psi.PsiFile
  * Appears as a lightbulb action on inline annotations from [DocscribeAnnotator].
  */
 class DocscribeFixIntention : IntentionAction {
+    /**
+     * The display text shown in the Alt+Enter intention menu.
+     */
     override fun getText(): String = "DocScribe: Apply safe fix"
 
+    /**
+     * The family name groups related intentions together in settings.
+     */
     override fun getFamilyName(): String = "DocScribe"
 
+    /**
+     * Available only for `.rb` files.
+     */
     override fun isAvailable(
         project: Project,
         editor: Editor?,
         file: PsiFile?,
     ): Boolean = file != null && file.name.endsWith(".rb")
 
+    /**
+     * Save the editor, find the project root, and run docscribe safe fix in a background task.
+     * On success, refresh the file from disk.
+     */
     override fun invoke(
         project: Project,
         editor: Editor?,
@@ -77,5 +90,8 @@ class DocscribeFixIntention : IntentionAction {
         }.queue()
     }
 
+    /**
+     * This intention does not modify the PSI directly, so it runs outside a write action.
+     */
     override fun startInWriteAction(): Boolean = false
 }

@@ -14,17 +14,35 @@ import com.intellij.openapi.progress.Task
 import com.intellij.openapi.project.Project
 import com.intellij.psi.PsiFile
 
+/**
+ * Intention action (lightbulb) that applies an **aggressive** docscribe fix to the annotated file.
+ *
+ * Appears as "DocScribe: Apply aggressive fix" in the Alt+Enter quick-fix menu.
+ * Generates full YARD documentation via docscribe's `-A -k -B` flags, preserving existing manual descriptions.
+ */
 class DocscribeAggressiveFixIntention : IntentionAction {
+    /**
+     * The display text shown in the Alt+Enter intention menu.
+     */
     override fun getText(): String = "DocScribe: Apply aggressive fix"
 
+    /**
+     * The family name groups related intentions together in settings.
+     */
     override fun getFamilyName(): String = "DocScribe"
 
+    /**
+     * Available only for `.rb` files.
+     */
     override fun isAvailable(
         project: Project,
         editor: Editor?,
         file: PsiFile?,
     ): Boolean = file != null && file.name.endsWith(".rb")
 
+    /**
+     * Run docscribe aggressive fix in a background task, then refresh the file on success.
+     */
     override fun invoke(
         project: Project,
         editor: Editor?,
@@ -71,5 +89,8 @@ class DocscribeAggressiveFixIntention : IntentionAction {
         }.queue()
     }
 
+    /**
+     * This intention does not modify the PSI directly, so it runs outside a write action.
+     */
     override fun startInWriteAction(): Boolean = false
 }

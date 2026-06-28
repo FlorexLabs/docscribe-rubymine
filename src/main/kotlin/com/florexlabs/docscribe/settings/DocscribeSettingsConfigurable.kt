@@ -16,8 +16,14 @@ class DocscribeSettingsConfigurable : Configurable {
     @JvmField var hideCommentsCheckBox = JBCheckBox("Hide comments by default")
     private var panel: JPanel? = null
 
+    /**
+     * The display name shown in the Settings dialog tree under **Tools**.
+     */
     override fun getDisplayName(): String = "DocScribe"
 
+    /**
+     * Build the settings panel with the "Hide comments by default" checkbox.
+     */
     override fun createComponent(): JComponent {
         val settings = DocscribeSettings.getInstance()
         hideCommentsCheckBox.isSelected = settings.hideCommentsByDefault
@@ -30,11 +36,17 @@ class DocscribeSettingsConfigurable : Configurable {
         return panel!!
     }
 
+    /**
+     * Whether the settings have been modified since the last apply.
+     */
     override fun isModified(): Boolean {
         val s = DocscribeSettings.getInstance()
         return hideCommentsCheckBox.isSelected != s.hideCommentsByDefault
     }
 
+    /**
+     * Persist the current checkbox state and publish a settings change event.
+     */
     override fun apply() {
         val s = DocscribeSettings.getInstance()
         s.hideCommentsByDefault = hideCommentsCheckBox.isSelected
@@ -45,6 +57,9 @@ class DocscribeSettingsConfigurable : Configurable {
             .settingsChanged()
     }
 
+    /**
+     * Reset the checkbox to the current stored setting value.
+     */
     override fun reset() {
         val s = DocscribeSettings.getInstance()
         hideCommentsCheckBox.isSelected = s.hideCommentsByDefault
