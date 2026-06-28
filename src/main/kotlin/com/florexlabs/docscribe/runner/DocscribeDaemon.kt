@@ -415,25 +415,27 @@ class DocscribeDaemon(
         @JvmStatic
         fun getInstance(project: Project): DocscribeDaemon = project.getService(DocscribeDaemon::class.java)
 
+        fun commandFromOptions(options: RunOptions): String =
+            when (options.subcommand) {
+                "update_types" -> {
+                    "update_types"
+                }
+
+                else -> {
+                    when (options.strategy) {
+                        DocscribeStrategy.SAFE -> "safe_fix"
+                        DocscribeStrategy.AGGRESSIVE -> "aggressive_fix"
+                        DocscribeStrategy.CHECK -> "check"
+                    }
+                }
+            }
+
         fun executeWithFallback(
             project: Project,
             options: RunOptions,
         ): RunResult {
             val daemon = getInstance(project)
-            val command =
-                when (options.subcommand) {
-                    "update_types" -> {
-                        "update_types"
-                    }
-
-                    else -> {
-                        when (options.strategy) {
-                            DocscribeStrategy.SAFE -> "safe_fix"
-                            DocscribeStrategy.AGGRESSIVE -> "aggressive_fix"
-                            DocscribeStrategy.CHECK -> "check"
-                        }
-                    }
-                }
+            val command = commandFromOptions(options)
             return daemon.execute(
                 command = command,
                 file = options.file,
