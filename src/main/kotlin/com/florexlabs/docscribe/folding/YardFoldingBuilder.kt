@@ -42,7 +42,17 @@ class YardFoldingBuilder :
                 if (hasYardTag && blockEnd > blockStart) {
                     val startOffset = document.getLineStartOffset(blockStart)
                     val endOffset = document.getLineEndOffset(blockEnd)
-                    regions.add(FoldingDescriptor(root.node, TextRange(startOffset, endOffset)))
+                    val settings = DocscribeSettings.getInstance()
+                    regions.add(
+                        FoldingDescriptor(
+                            root.node,
+                            TextRange(startOffset, endOffset),
+                            null,
+                            null,
+                            settings.hideCommentsByDefault,
+                            emptySet(),
+                        ),
+                    )
                 }
             } else {
                 i++

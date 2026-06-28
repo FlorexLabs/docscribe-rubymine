@@ -45,7 +45,7 @@
       id="com.florexlabs.docscribe.settings"
       instance="com.florexlabs.docscribe.settings.DocscribeSettingsConfigurable"/>
 
-    <lang.foldingBuilder language="Ruby"
+    <lang.foldingBuilder language="ruby" order="first"
                          implementationClass="com.florexlabs.docscribe.folding.YardFoldingBuilder"/>
 
     <dependencySupport kind="ruby" coordinate="docscribe" displayName="docscribe gem"/>

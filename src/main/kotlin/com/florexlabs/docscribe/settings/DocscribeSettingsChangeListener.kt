@@ -33,7 +33,7 @@ internal class DocscribeSettingsChangeListenerImpl : DocscribeSettingsChangeList
             val fileEditorManager = FileEditorManager.getInstance(project)
             for (editor in fileEditorManager.allEditors) {
                 val textEditor = editor as? TextEditor ?: continue
-                CodeFoldingManager.getInstance(project).updateFoldRegionsAsync(textEditor.editor, false)
+                CodeFoldingManager.getInstance(project).updateFoldRegionsAsync(textEditor.editor, true)
             }
         }
     }
