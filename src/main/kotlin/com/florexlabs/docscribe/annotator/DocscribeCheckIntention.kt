@@ -40,7 +40,7 @@ class DocscribeCheckIntention : IntentionAction {
         project: Project,
         editor: Editor?,
         file: PsiFile?,
-    ): Boolean = file != null && file.name.endsWith(".rb")
+    ): Boolean = file != null && (file.name.endsWith(".rb") || file.name.endsWith(".rake"))
 
     /**
      * Run docscribe check in a background task and show a notification on completion.

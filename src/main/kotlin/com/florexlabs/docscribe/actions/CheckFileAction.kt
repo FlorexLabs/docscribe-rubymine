@@ -70,7 +70,7 @@ class CheckFileAction : AnAction() {
      */
     override fun update(e: AnActionEvent) {
         val file = e.getData(CommonDataKeys.VIRTUAL_FILE)
-        e.presentation.isEnabledAndVisible = file != null && file.name.endsWith(".rb")
+        e.presentation.isEnabledAndVisible = file != null && (file.name.endsWith(".rb") || file.name.endsWith(".rake"))
     }
 
     /**
