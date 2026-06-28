@@ -14,11 +14,9 @@ import java.net.StandardProtocolFamily
 import java.net.UnixDomainSocketAddress
 import java.nio.ByteBuffer
 import java.nio.channels.SocketChannel
-import java.nio.file.Files
 import java.nio.file.Path
 import java.util.concurrent.TimeUnit
 import kotlin.concurrent.Volatile
-import kotlin.io.path.deleteIfExists
 
 @Service(Service.Level.PROJECT)
 class DocscribeDaemon(
@@ -130,31 +128,25 @@ class DocscribeDaemon(
         if (existing != null && alive) return existing
 
         val ruby = rubyCommand() ?: return null
-        val socketDir =
-            try {
-                Files.createTempDirectory("docscribe-")
-            } catch (e: Exception) {
-                log.warn("Failed to create temp dir for socket", e)
-                return null
-            }
-        val socketPath = socketDir.resolve("server.sock")
+        val gemRoot =
+            DocscribeRunner.findProjectRoot(projectDir ?: project.basePath ?: "")
+                ?: return null
 
         val script =
             "require 'docscribe/server'; " +
-                "Docscribe::Server.ensure_running!(socket: '${socketPath.toString().replace("'", "\\'")}'); " +
-                "puts 'ready'"
+                "Docscribe::Server.ensure_running!(daemonize: false, timeout: $STARTUP_TIMEOUT_SECONDS); " +
+                "puts Docscribe::Server.socket_path"
 
-        val pb = ProcessBuilder("env", ruby, "-e", script, "--", projectDir ?: project.basePath ?: "")
+        val pb =
+            ProcessBuilder(ruby, "-e", script)
+                .directory(File(gemRoot))
         val env = pb.environment()
         val sdk = ProjectRootManager.getInstance(project).projectSdk
         if (sdk?.homePath != null) {
             val sdkBin = File(sdk.homePath, "bin").absolutePath
             val currentPath = env["PATH"] ?: ""
             env["PATH"] = "$sdkBin${File.pathSeparator}$currentPath"
-            val gemRoot = DocscribeRunner.findProjectRoot(projectDir ?: project.basePath ?: "")
-            if (gemRoot != null) {
-                env["BUNDLE_GEMFILE"] = File(gemRoot, "Gemfile").absolutePath
-            }
+            env["BUNDLE_GEMFILE"] = File(gemRoot, "Gemfile").absolutePath
         }
 
         val localGemPath = System.getProperty("docscribe.local.gem.path")
@@ -164,7 +156,7 @@ class DocscribeDaemon(
             env["RUBYLIB"] = if (existingRubyLib != null) "$existingRubyLib:$libPath" else libPath
         }
 
-        pb.redirectErrorStream(false)
+        pb.redirectErrorStream(true)
         val proc =
             try {
                 pb.start()
@@ -173,37 +165,35 @@ class DocscribeDaemon(
                 return null
             }
 
-        if (!failFastIfDead(proc)) return null
-
-        val handle = ServerHandle(socketPath, proc)
-        server = handle
-        alive = true
-        log.info("Docscribe server started on socket $socketPath")
-        return handle
-    }
-
-    private fun failFastIfDead(proc: Process): Boolean {
         val reader = proc.inputStream.bufferedReader()
-        val stderrReader = proc.errorStream.bufferedReader()
-        val line =
+        val socketPathLine =
             try {
                 reader.readLine()
             } catch (_: Exception) {
                 null
             }
-        if (line == null) {
-            val stderr = stderrReader.readText()
-            log.warn("Server failed to start: $stderr")
-            showNotification("DocScribe server failed to start: $stderr")
-            return false
+
+        val exitCode = proc.waitFor(STARTUP_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+        if (!exitCode) {
+            proc.destroyForcibly()
+            log.warn("Server startup timed out after ${STARTUP_TIMEOUT_SECONDS}s")
+            showNotification("DocScribe server startup timed out")
+            return null
         }
-        if (line != "ready") {
-            val stderr = stderrReader.readText()
-            log.warn("Unexpected server output: '$line' stderr: $stderr")
-            showNotification("DocScribe server error: $line")
-            return false
+
+        if (socketPathLine.isNullOrBlank() || proc.exitValue() != 0) {
+            val err = reader.readText()
+            log.warn("Server failed to start: $socketPathLine $err")
+            showNotification("DocScribe server failed to start: ${socketPathLine ?: err}")
+            return null
         }
-        return true
+
+        val socketPath = Path.of(socketPathLine.trim())
+        val handle = ServerHandle(socketPath, proc)
+        server = handle
+        alive = true
+        log.info("Docscribe server started on socket $socketPath")
+        return handle
     }
 
     private fun showNotification(message: String) {
@@ -303,14 +293,6 @@ class DocscribeDaemon(
             val srv = server ?: return
             try {
                 rpcCall(srv, "shutdown")
-            } catch (_: Exception) {
-            }
-            try {
-                srv.process.destroyForcibly()
-            } catch (_: Exception) {
-            }
-            try {
-                srv.socketPath.parent?.deleteIfExists()
             } catch (_: Exception) {
             }
             die()
