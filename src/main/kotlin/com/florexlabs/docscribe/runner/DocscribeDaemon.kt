@@ -45,12 +45,11 @@ class DocscribeDaemon(
         file: String? = null,
         projectDir: String? = null,
         formatJson: Boolean = false,
-        useRbs: Boolean = false,
         noBoilerplate: Boolean = false,
     ): RunResult {
         synchronized(lock) {
             val handle = ensureRunning(projectDir) ?: return fallback(command, file, projectDir, formatJson)
-            val params = buildExecuteParams(file, projectDir, useRbs, noBoilerplate)
+            val params = buildExecuteParams(file, projectDir, noBoilerplate)
             val response = performRpcCall(handle, command, params)
             return processRpcResponse(response, command, file, projectDir, formatJson)
         }
@@ -59,7 +58,6 @@ class DocscribeDaemon(
     private fun buildExecuteParams(
         file: String?,
         projectDir: String?,
-        useRbs: Boolean,
         noBoilerplate: Boolean,
     ): Map<String, Any?> {
         val params =
@@ -67,7 +65,6 @@ class DocscribeDaemon(
                 "file" to file,
                 "project_dir" to (projectDir ?: project.basePath ?: ""),
             )
-        if (useRbs) params["rbs"] = true
         if (noBoilerplate) params["no_boilerplate"] = true
         return params
     }
@@ -173,7 +170,8 @@ class DocscribeDaemon(
         gemRoot: String,
     ): Process? {
         val script =
-            "require 'docscribe/server'; " +
+            "require 'bundler/setup'; " +
+                "require 'docscribe/server'; " +
                 "Docscribe::Server.ensure_running!(daemonize: false, timeout: $STARTUP_TIMEOUT_SECONDS); " +
                 "puts Docscribe::Server.socket_path"
 
@@ -310,7 +308,6 @@ class DocscribeDaemon(
         projectDir: String?,
         formatJson: Boolean,
     ): RunResult {
-        val settings = DocscribeSettings.getInstance()
         val strategy = strategyFromCommand(command)
         val options =
             RunOptions(
@@ -319,7 +316,7 @@ class DocscribeDaemon(
                 strategy = strategy,
                 formatJson = formatJson,
             )
-        return DocscribeRunner.runDocscribe(options, settings, DefaultCommandExecutor())
+        return DocscribeRunner.runDocscribe(options, DefaultCommandExecutor())
     }
 
     private fun die() {
@@ -427,32 +424,24 @@ class DocscribeDaemon(
         fun executeWithFallback(
             project: Project,
             options: RunOptions,
-            settings: DocscribeSettings = DocscribeSettings.getInstance(),
         ): RunResult {
-            if (!settings.useDaemon) {
-                return DocscribeRunner.runDocscribe(options, settings, DefaultCommandExecutor())
-            }
+            val settings = DocscribeSettings.getInstance()
             val daemon = getInstance(project)
             val command =
                 when (options.subcommand) {
-                    "update_types" -> {
-                        "update_types"
-                    }
-
-                    else -> {
+                    "update_types" -> "update_types"
+                    else ->
                         when (options.strategy) {
                             DocscribeStrategy.SAFE -> "safe_fix"
                             DocscribeStrategy.AGGRESSIVE -> "aggressive_fix"
                             DocscribeStrategy.CHECK -> "check"
                         }
-                    }
                 }
             return daemon.execute(
                 command = command,
                 file = options.file,
                 projectDir = options.projectDir.let { d -> DocscribeRunner.findProjectRoot(d) ?: d },
                 formatJson = options.formatJson,
-                useRbs = settings.useRbs,
                 noBoilerplate = settings.omitBoilerplate,
             )
         }

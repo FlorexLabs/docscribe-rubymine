@@ -19,46 +19,69 @@ class DocscribeSettingsConfigurableTest : BasePlatformTestCase() {
         assertFalse(c.isModified)
     }
 
-    fun testIsModifiedAfterFieldChange() {
+    fun testIsModifiedAfterOmitBoilerplateToggle() {
         val c = DocscribeSettingsConfigurable()
         c.createComponent()
-        c.commandPathField.text = "/custom/path"
+        c.omitBoilerplateCheckBox.isSelected = !c.omitBoilerplateCheckBox.isSelected
+        assertTrue(c.isModified)
+    }
+
+    fun testIsModifiedAfterHideCommentsToggle() {
+        val c = DocscribeSettingsConfigurable()
+        c.createComponent()
+        c.hideCommentsCheckBox.isSelected = !c.hideCommentsCheckBox.isSelected
         assertTrue(c.isModified)
     }
 
     fun testIsModifiedFalseAfterApply() {
         val c = DocscribeSettingsConfigurable()
         c.createComponent()
-        c.commandPathField.text = "/custom/path"
+        c.omitBoilerplateCheckBox.isSelected = !c.omitBoilerplateCheckBox.isSelected
         c.apply()
         assertFalse(c.isModified)
     }
 
-    fun testApplyPersistsChanges() {
+    fun testApplyPersistsOmitBoilerplate() {
         val s = DocscribeSettings.getInstance()
-        val originalPath = s.commandPath
+        val originalOmit = s.omitBoilerplate
         val c = DocscribeSettingsConfigurable()
         c.createComponent()
-        c.commandPathField.text = "/custom/docscribe"
-        c.useBundleExecCheckBox.isSelected = true
         c.omitBoilerplateCheckBox.isSelected = false
         c.apply()
-        assertEquals("/custom/docscribe", s.commandPath)
-        assertTrue(s.useBundleExec)
         assertFalse(s.omitBoilerplate)
-        s.commandPath = originalPath
-        s.useBundleExec = false
+        s.omitBoilerplate = originalOmit
+    }
+
+    fun testApplyPersistsHideComments() {
+        val s = DocscribeSettings.getInstance()
+        val originalHide = s.hideCommentsByDefault
+        val c = DocscribeSettingsConfigurable()
+        c.createComponent()
+        c.hideCommentsCheckBox.isSelected = true
+        c.apply()
+        assertTrue(s.hideCommentsByDefault)
+        s.hideCommentsByDefault = originalHide
+    }
+
+    fun testResetRestoresOmitBoilerplate() {
+        val s = DocscribeSettings.getInstance()
+        s.omitBoilerplate = false
+        val c = DocscribeSettingsConfigurable()
+        c.createComponent()
+        c.omitBoilerplateCheckBox.isSelected = true
+        c.reset()
+        assertFalse(c.omitBoilerplateCheckBox.isSelected)
         s.omitBoilerplate = true
     }
 
-    fun testResetRestoresFromSettings() {
+    fun testResetRestoresHideComments() {
         val s = DocscribeSettings.getInstance()
-        s.commandPath = "/tmp/docscribe"
+        s.hideCommentsByDefault = true
         val c = DocscribeSettingsConfigurable()
         c.createComponent()
-        c.commandPathField.text = ""
+        c.hideCommentsCheckBox.isSelected = false
         c.reset()
-        assertEquals("/tmp/docscribe", c.commandPathField.text)
-        s.commandPath = "docscribe"
+        assertTrue(c.hideCommentsCheckBox.isSelected)
+        s.hideCommentsByDefault = false
     }
 }

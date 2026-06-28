@@ -11,6 +11,7 @@ import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.progress.ProgressIndicator
 import com.intellij.openapi.progress.Task
 import com.intellij.openapi.project.Project
+import java.io.File
 
 /**
  * Run `docscribe update_types` to refresh YARD documentation from RBS signatures.
@@ -26,7 +27,7 @@ class UpdateTypesAction : AnAction() {
                 notify(project, "No Gemfile found in project tree", NotificationType.ERROR)
                 return
             }
-        if (!DocscribeRunner.gemfileHasRbs("$projectRoot/Gemfile")) {
+        if (!gemfileHasRbs("$projectRoot/Gemfile")) {
             notify(project, "RBS not found in Gemfile — update_types requires RBS", NotificationType.WARNING)
             return
         }
@@ -70,7 +71,7 @@ class UpdateTypesAction : AnAction() {
             e.presentation.isEnabledAndVisible = false
             return
         }
-        e.presentation.isEnabledAndVisible = DocscribeRunner.gemfileHasRbs("$projectRoot/Gemfile")
+        e.presentation.isEnabledAndVisible = gemfileHasRbs("$projectRoot/Gemfile")
     }
 
     override fun getActionUpdateThread() = ActionUpdateThread.BGT
@@ -83,4 +84,12 @@ class UpdateTypesAction : AnAction() {
         val group = NotificationGroupManager.getInstance().getNotificationGroup("DocScribe")
         group.createNotification(content, type).notify(project)
     }
+
+    private fun gemfileHasRbs(gemfilePath: String): Boolean =
+        try {
+            val content = File(gemfilePath).readText()
+            Regex("""gem\s+['"]rbs['"]""").containsMatchIn(content)
+        } catch (_: Exception) {
+            false
+        }
 }
