@@ -88,4 +88,10 @@ tasks {
             jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21)
         }
     }
+    withType<org.jetbrains.intellij.platform.gradle.tasks.RunIdeTask> {
+        val localGemPath = project.findProperty("docscribe.local.gem.path")?.toString()
+        if (localGemPath != null) {
+            jvmArgs(listOf("-Ddocscribe.local.gem.path=$localGemPath"))
+        }
+    }
 }

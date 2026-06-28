@@ -53,6 +53,7 @@ class SafeFixAction : AnAction() {
                 if (failed) {
                     notify(project, "DocScribe: error applying safe fix", NotificationType.ERROR)
                 } else {
+                    vFile.refresh(false, false)
                     FileDocumentManager.getInstance().reloadFiles(vFile)
                     notify(project, "DocScribe: safe fix applied", NotificationType.INFORMATION)
                 }

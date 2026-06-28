@@ -16,6 +16,7 @@ import java.nio.ByteBuffer
 import java.nio.channels.SocketChannel
 import java.nio.file.Files
 import java.nio.file.Path
+import java.util.concurrent.TimeUnit
 import kotlin.concurrent.Volatile
 import kotlin.io.path.deleteIfExists
 
@@ -60,11 +61,22 @@ class DocscribeDaemon(
             val response =
                 when (command) {
                     "check" -> rpcCall(handle, "check", params)
+
                     "safe_fix" -> rpcCall(handle, "fix", params + mapOf("strategy" to "safe"))
+
                     "aggressive_fix" -> rpcCall(handle, "fix", params + mapOf("strategy" to "aggressive"))
+
                     "ping" -> rpcCall(handle, "ping")
+
                     "update_types" -> rpcCall(handle, "update_types")
-                    else -> return RunResult(success = false, hasIssues = false, exitCode = 1, stdout = "", stderr = "Unknown command: $command")
+
+                    else -> return RunResult(
+                        success = false,
+                        hasIssues = false,
+                        exitCode = 1,
+                        stdout = "",
+                        stderr = "Unknown command: $command",
+                    )
                 }
 
             if (response == null) {
@@ -199,18 +211,30 @@ class DocscribeDaemon(
         group.createNotification(message, NotificationType.ERROR).notify(project)
     }
 
+    @Suppress("TooGenericExceptionCaught")
     private fun rubyCommand(): String? {
         val sdk = ProjectRootManager.getInstance(project).projectSdk
-        if (sdk == null) {
-            log.warn("No Ruby SDK configured for project")
-            return null
+        if (sdk?.homePath != null) {
+            val rubyPath = "${sdk.homePath}/bin/ruby"
+            if (File(rubyPath).canExecute()) return rubyPath
+            log.warn("Ruby SDK configured but binary not found at $rubyPath, falling back to shell")
+        } else {
+            log.warn("No Ruby SDK configured, falling back to shell discovery")
         }
-        val rubyPath = "${sdk.homePath}/bin/ruby"
-        if (!File(rubyPath).canExecute()) {
-            log.warn("Ruby binary not found at $rubyPath")
-            return null
+
+        return try {
+            val proc = ProcessBuilder("bash", "-lc", "which ruby").start()
+            val path =
+                proc.inputStream
+                    .bufferedReader()
+                    .readLine()
+                    ?.trim()
+            proc.waitFor(5, TimeUnit.SECONDS)
+            if (path != null && path.isNotBlank() && File(path).canExecute()) path else null
+        } catch (e: Exception) {
+            log.warn("Failed to find Ruby via shell", e)
+            null
         }
-        return rubyPath
     }
 
     @Suppress("TooGenericExceptionCaught")
