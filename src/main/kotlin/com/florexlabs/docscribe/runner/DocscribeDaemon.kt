@@ -429,13 +429,17 @@ class DocscribeDaemon(
             val daemon = getInstance(project)
             val command =
                 when (options.subcommand) {
-                    "update_types" -> "update_types"
-                    else ->
+                    "update_types" -> {
+                        "update_types"
+                    }
+
+                    else -> {
                         when (options.strategy) {
                             DocscribeStrategy.SAFE -> "safe_fix"
                             DocscribeStrategy.AGGRESSIVE -> "aggressive_fix"
                             DocscribeStrategy.CHECK -> "check"
                         }
+                    }
                 }
             return daemon.execute(
                 command = command,

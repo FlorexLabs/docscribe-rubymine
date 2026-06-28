@@ -97,10 +97,12 @@ object DocscribeRunner {
                 args.add("-a")
                 if (omitBoilerplate) args.add("-B")
             }
+
             DocscribeStrategy.AGGRESSIVE -> {
                 args.addAll(listOf("-A", "-k"))
                 if (omitBoilerplate) args.add("-B")
             }
+
             DocscribeStrategy.CHECK -> {}
         }
         if (formatJson && strategy == DocscribeStrategy.CHECK) {

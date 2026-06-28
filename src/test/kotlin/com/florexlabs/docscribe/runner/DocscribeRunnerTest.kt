@@ -9,7 +9,11 @@ class DocscribeRunnerTest {
         var lastArgs: List<String>? = null
         var lastCwd: String? = null
 
-        override fun execute(cmd: String, args: List<String>, cwd: String): RunResult {
+        override fun execute(
+            cmd: String,
+            args: List<String>,
+            cwd: String,
+        ): RunResult {
             lastCommand = cmd
             lastArgs = args
             lastCwd = cwd

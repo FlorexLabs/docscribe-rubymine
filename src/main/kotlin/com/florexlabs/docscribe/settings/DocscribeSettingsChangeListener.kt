@@ -1,8 +1,8 @@
 package com.florexlabs.docscribe.settings
 
+import com.intellij.codeInsight.folding.CodeFoldingManager
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.Service
-import com.intellij.codeInsight.folding.CodeFoldingManager
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.fileEditor.TextEditor
 import com.intellij.openapi.project.ProjectManager
@@ -20,7 +20,11 @@ interface DocscribeSettingsChangeListener {
 @Service(Service.Level.APP)
 internal class DocscribeSettingsChangeListenerImpl : DocscribeSettingsChangeListener {
     init {
-        ApplicationManager.getApplication().messageBus.connect().subscribe(DocscribeSettingsChangeListener.TOPIC, this)
+        ApplicationManager
+            .getApplication()
+            .messageBus
+            .connect()
+            .subscribe(DocscribeSettingsChangeListener.TOPIC, this)
     }
 
     override fun settingsChanged() {

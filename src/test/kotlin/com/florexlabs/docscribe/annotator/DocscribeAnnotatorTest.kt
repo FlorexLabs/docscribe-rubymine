@@ -34,13 +34,15 @@ class DocscribeAnnotatorTest : BasePlatformTestCase() {
     fun testConfigHashChangesWithOmitBoilerplate() {
         val settings = DocscribeSettings.getInstance()
         settings.omitBoilerplate = false
-        val hashFalse = DocscribeAnnotator().collectInformation(myFixture.configureByText("a.rb", "")).let {
-            it!!.configHash.also { settings.omitBoilerplate = true }
-        }
+        val hashFalse =
+            DocscribeAnnotator().collectInformation(myFixture.configureByText("a.rb", "")).let {
+                it!!.configHash.also { settings.omitBoilerplate = true }
+            }
         settings.omitBoilerplate = true
-        val hashTrue = DocscribeAnnotator().collectInformation(myFixture.configureByText("b.rb", "")).let {
-            it!!.configHash.also { settings.omitBoilerplate = false }
-        }
+        val hashTrue =
+            DocscribeAnnotator().collectInformation(myFixture.configureByText("b.rb", "")).let {
+                it!!.configHash.also { settings.omitBoilerplate = false }
+            }
         assertNotSame(hashFalse, hashTrue)
         settings.omitBoilerplate = true
     }

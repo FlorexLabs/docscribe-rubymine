@@ -44,7 +44,9 @@ class DocscribeSettingsConfigurable : Configurable {
         val s = DocscribeSettings.getInstance()
         s.omitBoilerplate = omitBoilerplateCheckBox.isSelected
         s.hideCommentsByDefault = hideCommentsCheckBox.isSelected
-        ApplicationManager.getApplication().messageBus
+        ApplicationManager
+            .getApplication()
+            .messageBus
             .syncPublisher(DocscribeSettingsChangeListener.TOPIC)
             .settingsChanged()
     }
