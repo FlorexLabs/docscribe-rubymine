@@ -2,6 +2,8 @@ package com.florexlabs.docscribe.runner
 
 import org.junit.Assert.assertEquals
 import org.junit.Test
+import java.io.File
+import kotlin.io.path.createTempDirectory
 
 class DocscribeRunnerTest {
     private class RecordingExecutor : CommandExecutor {
@@ -78,9 +80,19 @@ class DocscribeRunnerTest {
 
     @Test
     fun `runDocscribe defaults to DefaultCommandExecutor does not throw`() {
-        // Should complete without exception (default executor is used internally)
-        DocscribeRunner.runDocscribe(
-            RunOptions(projectDir = "/tmp", strategy = DocscribeStrategy.CHECK),
-        )
+        val tempDir = createTempDirectory().toFile()
+        try {
+            File(tempDir, "Gemfile").writeText(
+                """
+                source "https://rubygems.org"
+                gem "docscribe"
+                """.trimIndent(),
+            )
+            DocscribeRunner.runDocscribe(
+                RunOptions(projectDir = tempDir.absolutePath, strategy = DocscribeStrategy.CHECK),
+            )
+        } finally {
+            tempDir.deleteRecursively()
+        }
     }
 }
