@@ -75,4 +75,12 @@ class DocscribeRunnerTest {
         )
         assertEquals(listOf("exec", "docscribe", "--format", "json"), executor.lastArgs)
     }
+
+    @Test
+    fun `runDocscribe defaults to DefaultCommandExecutor does not throw`() {
+        // Should complete without exception (default executor is used internally)
+        DocscribeRunner.runDocscribe(
+            RunOptions(projectDir = "/tmp", strategy = DocscribeStrategy.CHECK),
+        )
+    }
 }
