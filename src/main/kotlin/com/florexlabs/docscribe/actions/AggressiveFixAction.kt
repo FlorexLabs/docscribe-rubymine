@@ -48,13 +48,14 @@ class AggressiveFixAction : AnAction() {
                         formatJson = false,
                     )
                 val result = DocscribeDaemon.executeWithFallback(project, options)
-                failed = result.exitCode >= 2
+                failed = result.exitCode != 0
             }
 
             override fun onSuccess() {
                 if (failed) {
                     notify(project, "DocScribe: error applying aggressive fix", NotificationType.ERROR)
                 } else {
+                    vFile.refresh(false, false)
                     FileDocumentManager.getInstance().reloadFiles(vFile)
                     notify(project, "DocScribe: aggressive fix applied", NotificationType.INFORMATION)
                 }

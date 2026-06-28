@@ -51,7 +51,7 @@ class DocscribeAggressiveFixIntention : IntentionAction {
                         formatJson = false,
                     )
                 val result = DocscribeDaemon.executeWithFallback(project, options)
-                failed = result.exitCode >= 2
+                failed = result.exitCode != 0
             }
 
             override fun onSuccess() {
@@ -61,6 +61,7 @@ class DocscribeAggressiveFixIntention : IntentionAction {
                         .createNotification("DocScribe: error applying aggressive fix", NotificationType.ERROR)
                         .notify(project)
                 } else {
+                    vFile.refresh(false, false)
                     FileDocumentManager.getInstance().reloadFiles(vFile)
                     group
                         .createNotification("DocScribe: aggressive fix applied", NotificationType.INFORMATION)
