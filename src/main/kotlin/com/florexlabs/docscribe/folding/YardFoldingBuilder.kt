@@ -27,14 +27,19 @@ class YardFoldingBuilder :
 
         var i = 0
         while (i < lines.size) {
-            val line = lines[i]
-            if (isYardLine(line.trimStart())) {
+            val line = lines[i].trimStart()
+            if (line.startsWith("#")) {
                 val blockStart = i
-                while (i < lines.size && isYardLine(lines[i].trimStart())) {
+                var hasYardTag = containsYardTag(line)
+                i++
+                while (i < lines.size) {
+                    val next = lines[i].trimStart()
+                    if (!next.startsWith("#")) break
+                    if (containsYardTag(next)) hasYardTag = true
                     i++
                 }
                 val blockEnd = i - 1
-                if (blockEnd > blockStart) {
+                if (hasYardTag && blockEnd > blockStart) {
                     val startOffset = document.getLineStartOffset(blockStart)
                     val endOffset = document.getLineEndOffset(blockEnd)
                     regions.add(FoldingDescriptor(root.node, TextRange(startOffset, endOffset)))
@@ -53,8 +58,6 @@ class YardFoldingBuilder :
         val settings = DocscribeSettings.getInstance()
         return settings.hideCommentsByDefault
     }
-
-    private fun isYardLine(line: String): Boolean = line.startsWith("#") && containsYardTag(line)
 }
 
 private fun containsYardTag(line: String): Boolean {
