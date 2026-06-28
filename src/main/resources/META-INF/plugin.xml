@@ -22,7 +22,7 @@
         Initial release.
     ]]></change-notes>
 
-  <version>0.1.0</version>
+  <version>0.1.4</version>
   <idea-version since-build="261" until-build="261.*"/>
 
   <depends>com.intellij.modules.platform</depends>
