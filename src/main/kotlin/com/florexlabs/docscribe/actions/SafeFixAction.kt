@@ -46,7 +46,7 @@ class SafeFixAction : AnAction() {
                         formatJson = false,
                     )
                 val result = DocscribeDaemon.executeWithFallback(project, options)
-                failed = result.exitCode >= 2
+                failed = result.exitCode != 0
             }
 
             override fun onSuccess() {

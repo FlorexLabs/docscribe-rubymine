@@ -89,7 +89,9 @@ tasks {
         }
     }
     withType<org.jetbrains.intellij.platform.gradle.tasks.RunIdeTask> {
-        val localGemPath = project.findProperty("docscribe.local.gem.path")?.toString()
+        val localGemPath =
+            project.findProperty("docscribe.local.gem.path")?.toString()
+                ?: System.getenv("DOCSCRIBE_LOCAL_GEM_PATH")
         if (localGemPath != null) {
             jvmArgs(listOf("-Ddocscribe.local.gem.path=$localGemPath"))
         }

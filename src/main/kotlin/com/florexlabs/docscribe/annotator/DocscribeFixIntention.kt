@@ -57,7 +57,7 @@ class DocscribeFixIntention : IntentionAction {
                         formatJson = false,
                     )
                 val result = DocscribeDaemon.executeWithFallback(project, options)
-                failed = result.exitCode >= 2
+                failed = result.exitCode != 0
             }
 
             override fun onSuccess() {
@@ -67,6 +67,7 @@ class DocscribeFixIntention : IntentionAction {
                         .createNotification("DocScribe: failed to apply fix", NotificationType.ERROR)
                         .notify(project)
                 } else {
+                    vFile.refresh(false, false)
                     FileDocumentManager.getInstance().reloadFiles(vFile)
                     group
                         .createNotification("DocScribe: fix applied", NotificationType.INFORMATION)
