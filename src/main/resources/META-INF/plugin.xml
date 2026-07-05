@@ -45,11 +45,11 @@
         </ul>
     ]]></change-notes>
 
-  <version>0.1.4</version>
+  <version>0.1.5</version>
   <idea-version since-build="261" until-build="261.*"/>
 
   <depends>com.intellij.modules.platform</depends>
-  <depends>com.intellij.modules.ruby</depends>
+  <depends optional="true" config-file="withRubyPlugin.xml">com.intellij.modules.ruby</depends>
 
   <extensions defaultExtensionNs="com.intellij">
     <applicationService serviceImplementation="com.florexlabs.docscribe.settings.DocscribeSettings"/>
@@ -59,33 +59,12 @@
 
     <notificationGroup id="DocScribe" displayType="BALLOON" key="DocScribe notifications"/>
 
-    <externalAnnotator language="Ruby"
-                       implementationClass="com.florexlabs.docscribe.annotator.DocscribeAnnotator"/>
-
     <applicationConfigurable
       groupId="tools"
       displayName="DocScribe"
       id="com.florexlabs.docscribe.settings"
       instance="com.florexlabs.docscribe.settings.DocscribeSettingsConfigurable"/>
 
-    <lang.foldingBuilder language="ruby" order="first"
-                         implementationClass="com.florexlabs.docscribe.folding.YardFoldingBuilder"/>
-
-    <dependencySupport kind="ruby" coordinate="docscribe" displayName="docscribe gem"/>
-    <dependencySupport kind="ruby" coordinate="rbs" displayName="RBS"/>
-
-    <intentionAction>
-      <className>com.florexlabs.docscribe.annotator.DocscribeFixIntention</className>
-      <category>DocScribe</category>
-    </intentionAction>
-    <intentionAction>
-      <className>com.florexlabs.docscribe.annotator.DocscribeAggressiveFixIntention</className>
-      <category>DocScribe</category>
-    </intentionAction>
-    <intentionAction>
-      <className>com.florexlabs.docscribe.annotator.DocscribeCheckIntention</className>
-      <category>DocScribe</category>
-    </intentionAction>
   </extensions>
 
   <actions>
