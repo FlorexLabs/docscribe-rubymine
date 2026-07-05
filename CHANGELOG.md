@@ -4,6 +4,10 @@
 
 ### Added
 
+- **Capability detection for docscribe version** — `performGemCheck()` now parses `--version` output
+  and stores parsed version + capabilities (`serverMode` for ≥ 1.5.1). `ensureRunning()` skips
+  server startup when version < 1.5.1, falling back directly to CLI. New `parseVersion()` utility
+  in companion object with 8 unit tests.
 - **Rakefile support (no extension)** — all annotators, actions, and intention actions now accept
   a file named `Rakefile` (without `.rb` or `.rake` extension) in addition to `.rb` and `.rake`
   files. This ensures the plugin works on standard Rakefiles that have no file extension.

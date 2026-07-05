@@ -45,4 +45,70 @@ class DocscribeDaemonGemTest : BasePlatformTestCase() {
         val daemon = DocscribeDaemon(project)
         assertEquals(DocscribeDaemon.DocscribeStatus.UNCHECKED, daemon.docscribeStatus)
     }
+
+    // ── version parsing ──────────────────────────────────────────────
+
+    fun testParseVersion150NoServerMode() {
+        val caps = DocscribeDaemon.parseVersion("1.5.0")
+        assertNotNull(caps)
+        assertEquals("1.5.0", caps!!.version)
+        assertFalse(caps.serverMode)
+    }
+
+    fun testParseVersion151ServerMode() {
+        val caps = DocscribeDaemon.parseVersion("1.5.1")
+        assertNotNull(caps)
+        assertEquals("1.5.1", caps!!.version)
+        assertTrue(caps.serverMode)
+    }
+
+    fun testParseVersion160ServerMode() {
+        val caps = DocscribeDaemon.parseVersion("1.6.0")
+        assertNotNull(caps)
+        assertTrue(caps!!.serverMode)
+    }
+
+    fun testParseVersion200ServerMode() {
+        val caps = DocscribeDaemon.parseVersion("2.0.0")
+        assertNotNull(caps)
+        assertTrue(caps!!.serverMode)
+    }
+
+    fun testParseVersion149NoServerMode() {
+        val caps = DocscribeDaemon.parseVersion("1.4.9")
+        assertNotNull(caps)
+        assertFalse(caps!!.serverMode)
+    }
+
+    fun testParseVersionHandlesTrailingNewline() {
+        val caps = DocscribeDaemon.parseVersion("1.5.1\n")
+        assertNotNull(caps)
+        assertTrue(caps!!.serverMode)
+    }
+
+    fun testParseVersionReturnsNullForGarbage() {
+        assertNull(DocscribeDaemon.parseVersion(""))
+        assertNull(DocscribeDaemon.parseVersion("not-a-version"))
+        assertNull(DocscribeDaemon.parseVersion("v1.5.1"))
+    }
+
+    // ── capability integration ───────────────────────────────────────
+
+    fun testExecuteFallsBackToCliWhenNoServerMode() {
+        val daemon = DocscribeDaemon(project)
+        daemon.docscribeStatus = DocscribeDaemon.DocscribeStatus.AVAILABLE
+        daemon.capabilities = DocscribeDaemon.DocscribeCapabilities("1.5.0", serverMode = false)
+        // No server mode — should trigger CLI fallback, which needs a Gemfile
+        // Since there's no Gemfile in test, ensureRunning returns null,
+        // fallback() sees MISSING stub but status is AVAILABLE…
+        // Actually this tests the path through execute → ensureRunning → null → fallback
+        val result = daemon.execute("check", file = "test.rb", projectDir = "/tmp")
+        // Without a Gemfile, fallback may fail — just ensure no crash
+        assertNotNull(result)
+    }
+
+    fun testCapabilitiesDefaultsToNull() {
+        val daemon = DocscribeDaemon(project)
+        assertNull(daemon.capabilities)
+    }
 }

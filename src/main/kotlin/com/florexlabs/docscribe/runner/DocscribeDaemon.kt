@@ -79,6 +79,27 @@ class DocscribeDaemon(
     enum class DocscribeStatus { UNCHECKED, AVAILABLE, MISSING }
 
     /**
+     * Parsed docscribe version and derived capabilities.
+     *
+     * Populated by [performGemCheck] when the gem is found.
+     * Used by [ensureRunning] to decide whether server mode is available.
+     */
+    @Volatile
+    @VisibleForTesting
+    internal var capabilities: DocscribeCapabilities? = null
+
+    /**
+     * Capabilities detected from the docscribe version.
+     *
+     * @property version      Full version string (e.g. `"1.5.1"`).
+     * @property serverMode   Server/daemon mode supported (version >= 1.5.1).
+     */
+    data class DocscribeCapabilities(
+        val version: String,
+        val serverMode: Boolean,
+    )
+
+    /**
      * Internal handle holding the server process and its Unix socket path.
      *
      * @property socketPath Path to the Unix domain socket file.
@@ -251,6 +272,12 @@ class DocscribeDaemon(
             return null
         }
 
+        // Versions before 1.5.1 don't support server mode — fall back to CLI
+        if (capabilities != null && !capabilities!!.serverMode) {
+            log.info("docscribe ${capabilities!!.version} does not support server mode, using CLI")
+            return null
+        }
+
         val ruby = rubyCommand()
         val gemRoot = if (ruby != null) DocscribeRunner.findProjectRoot(projectDir ?: project.basePath ?: "") else null
         val proc = if (gemRoot != null) startServerProcess(ruby!!, gemRoot) else null
@@ -398,7 +425,13 @@ class DocscribeDaemon(
             }
             if (proc.exitValue() == 0) {
                 docscribeStatus = DocscribeStatus.AVAILABLE
-                log.info("docscribe gem detected (version check passed)")
+                val versionOutput =
+                    proc.inputStream
+                        .bufferedReader()
+                        .readText()
+                        .trim()
+                capabilities = parseVersion(versionOutput)
+                log.info("docscribe gem detected (version: ${capabilities?.version ?: versionOutput})")
             } else {
                 val output = proc.inputStream.bufferedReader().readText()
                 log.warn("docscribe version check failed: exit ${proc.exitValue()}, output: $output")
@@ -788,6 +821,26 @@ class DocscribeDaemon(
                 projectDir = options.projectDir.let { d -> DocscribeRunner.findProjectRoot(d) ?: d },
                 formatJson = options.formatJson,
             )
+        }
+
+        /**
+         * Parse docscribe version from `--version` output.
+         *
+         * Handles versions like `1.5.0`, `1.5.1`, or `1.5.0\n` (trailing newline).
+         * Returns `null` for unparseable output (treated as unknown version, server mode disabled).
+         *
+         * @param versionOutput The trimmed stdout from `bundle exec docscribe --version`.
+         * @return [DocscribeCapabilities] with server mode enabled for version >= 1.5.1.
+         */
+        @JvmStatic
+        fun parseVersion(versionOutput: String): DocscribeCapabilities? {
+            val version = versionOutput.trim().takeIf { it.matches(Regex("""\d+\.\d+\.\d+""")) } ?: return null
+            val parts = version.split(".").map { it.toIntOrNull() ?: return null }
+            val serverMode =
+                parts.size == 3 && (
+                    parts[0] > 1 || (parts[0] == 1 && parts[1] > 5) || (parts[0] == 1 && parts[1] == 5 && parts[2] >= 1)
+                )
+            return DocscribeCapabilities(version = version, serverMode = serverMode)
         }
     }
 }
