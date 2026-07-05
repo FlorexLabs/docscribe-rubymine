@@ -1,5 +1,30 @@
 # Changelog
 
+## [0.1.5] — 2026-07-05
+
+### Added
+
+- **Graceful handling when docscribe gem not installed** — `DocscribeDaemon` now runs
+  `bundle exec docscribe --version` once on first use and caches the result. If the gem is missing, a
+  user-friendly notification (with "Open Gemfile" action) is shown once, and all operations return a
+  clear error: *"Add 'gem \"docscribe\"' to your Gemfile and run 'bundle install'"*.
+- **Tests for gem availability check** — 5 new tests in `DocscribeDaemonGemTest.kt` covering MISSING
+  status, error message format, all command types, and status caching.
+
+### Changed
+
+- **`com.intellij.modules.ruby` made optional** — changed from hard `<depends>` to
+  `<depends optional="true" config-file="withRubyPlugin.xml">`. Ruby-specific extensions
+  (`ExternalAnnotator`, `FoldingBuilder`, `DependencySupport`, `IntentionAction`) moved to a new
+  secondary descriptor. Plugin now installs on IntelliJ IDEA without Ruby plugin (limited
+  functionality), unblocking Marketplace publication.
+- **Version** bumped from `0.1.4` to `0.1.5`.
+
+### Build
+
+- **`intellijDependencies()`** — added to repository section in `build.gradle.kts` (required by
+  `instrumentTestCode` task).
+
 ## [0.1.4] — 2026-06-29
 
 ### Fixed
