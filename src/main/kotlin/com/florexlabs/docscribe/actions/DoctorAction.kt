@@ -1,6 +1,7 @@
 package com.florexlabs.docscribe.actions
 
 import com.florexlabs.docscribe.runner.DocscribeDaemon
+import com.florexlabs.docscribe.runner.DocscribeDaemon.DocscribeCapabilities
 import com.florexlabs.docscribe.runner.DocscribeDaemon.DocscribeStatus
 import com.florexlabs.docscribe.runner.DocscribeRunner
 import com.florexlabs.docscribe.settings.DocscribeSettings
@@ -46,12 +47,37 @@ class DoctorAction : AnAction() {
      * @return Formatted diagnostic text with sections.
      */
     private fun buildReport(project: Project): String {
-        val lines = mutableListOf("=== DocScribe Diagnostics ===\n")
-
-        // --- Project ---
+        val daemon = DocscribeDaemon.getInstance(project)
         val basePath = project.basePath ?: "?"
-        lines += "Project root: $basePath"
         val gemRoot = DocscribeRunner.findProjectRoot(basePath)
+        val rubyPath = daemon.getRubyPath()
+        val status = daemon.getDocscribeStatus()
+        val caps = daemon.getCapabilities()
+
+        val lines = mutableListOf("=== DocScribe Diagnostics ===\n")
+        lines += projectInfoLines(basePath, gemRoot)
+        lines += ""
+        lines += rubySdkLines(project, daemon)
+        lines += ""
+        lines += gemInfoLines(status, caps)
+        lines += ""
+        lines += daemonInfoLines(project, status, caps)
+        lines += ""
+        val settings = DocscribeSettings.getInstance()
+        lines += listOf("Settings:", "  hideCommentsByDefault = ${settings.hideCommentsByDefault}")
+        lines += ""
+        lines += issuesSummaryLines(rubyPath, gemRoot, status)
+        return lines.joinToString("\n")
+    }
+
+    /**
+     * Project root and Gemfile status.
+     */
+    private fun projectInfoLines(
+        basePath: String,
+        gemRoot: String?,
+    ): List<String> {
+        val lines = mutableListOf("Project root: $basePath")
         val gemFile = if (gemRoot != null) File(gemRoot, "Gemfile") else null
         val gemStatus =
             when {
@@ -60,74 +86,83 @@ class DoctorAction : AnAction() {
                 else -> "not found (no Gemfile in tree)"
             }
         lines += "Gemfile: $gemStatus"
+        return lines
+    }
 
-        // --- Ruby SDK ---
-        lines += ""
+    /**
+     * IDE Ruby SDK and resolved Ruby binary path.
+     */
+    private fun rubySdkLines(
+        project: Project,
+        daemon: DocscribeDaemon,
+    ): List<String> {
         val sdk = ProjectRootManager.getInstance(project).projectSdk
         val sdkInfo =
-            if (sdk != null) {
-                "${sdk.name} (home: ${sdk.homePath ?: "?"})"
-            } else {
-                "not configured"
-            }
-        lines += "IDE Ruby SDK: $sdkInfo"
-
-        val daemon = DocscribeDaemon.getInstance(project)
+            if (sdk != null) "${sdk.name} (home: ${sdk.homePath ?: "?"})" else "not configured"
         val rubyPath = daemon.getRubyPath()
-        lines += "Ruby binary: ${rubyPath ?: "not found"}"
+        return listOf("IDE Ruby SDK: $sdkInfo", "Ruby binary: ${rubyPath ?: "not found"}")
+    }
 
-        // --- docscribe gem ---
-        lines += ""
-        val status = daemon.getDocscribeStatus()
-        lines += "docscribe gem: ${statusLabel(status)}"
+    /**
+     * docscribe gem availability, version, and server mode support.
+     */
+    private fun gemInfoLines(
+        status: DocscribeStatus,
+        caps: DocscribeCapabilities?,
+    ): List<String> {
+        val lines = mutableListOf("docscribe gem: ${statusLabel(status)}")
         if (status == DocscribeStatus.UNCHECKED) {
             lines += "  (run any DocScribe action to trigger gem detection)"
         }
-
-        val caps = daemon.getCapabilities()
         if (caps != null) {
             lines += "  Version: ${caps.version}"
             lines += "  Server mode: ${if (caps.serverMode) "supported (>= 1.5.1)" else "not available (< 1.5.1)"}"
         }
+        return lines
+    }
 
-        // --- Daemon server ---
-        lines += ""
+    /**
+     * Daemon server state and fallback explanation.
+     */
+    private fun daemonInfoLines(
+        project: Project,
+        status: DocscribeStatus,
+        caps: DocscribeCapabilities?,
+    ): List<String> {
+        val daemon = DocscribeDaemon.getInstance(project)
         val running = daemon.isServerRunning()
-        lines += "Daemon server: ${if (running) "running" else "stopped"}"
-
+        val lines = mutableListOf("Daemon server: ${if (running) "running" else "stopped"}")
         if (status == DocscribeStatus.AVAILABLE) {
             val shouldRun = caps?.serverMode == true
-            if (shouldRun && !running) {
-                lines += "  (will start on next DocScribe action)"
-            } else if (!shouldRun) {
-                lines += "  (server not available — using CLI fallback)"
+            when {
+                shouldRun && !running -> lines += "  (will start on next DocScribe action)"
+                !shouldRun -> lines += "  (server not available — using CLI fallback)"
             }
         } else if (status == DocscribeStatus.MISSING) {
             lines += "  (gem not installed — see 'docscribe gem' section above)"
         }
+        return lines
+    }
 
-        // --- Settings ---
-        lines += ""
-        val settings = DocscribeSettings.getInstance()
-        lines += "Settings:"
-        lines += "  hideCommentsByDefault = ${settings.hideCommentsByDefault}"
-
-        // --- Diagnostics summary ---
-        lines += ""
+    /**
+     * Collect identified issues with actionable steps.
+     */
+    private fun issuesSummaryLines(
+        rubyPath: String?,
+        gemRoot: String?,
+        status: DocscribeStatus,
+    ): List<String> {
         val issues = mutableListOf<String>()
         if (rubyPath == null) issues += "No Ruby SDK configured or found on PATH."
         if (gemRoot == null) issues += "No Gemfile found in project tree."
         if (status == DocscribeStatus.MISSING) {
             issues += "docscribe gem is not installed. Add 'gem \"docscribe\"' to Gemfile and run 'bundle install'."
         }
-        if (issues.isEmpty()) {
-            lines += "Status: OK — all systems nominal."
+        return if (issues.isEmpty()) {
+            listOf("Status: OK — all systems nominal.")
         } else {
-            lines += "Issues found:"
-            issues.forEach { lines += "  - $it" }
+            listOf("Issues found:") + issues.map { "  - $it" }
         }
-
-        return lines.joinToString("\n")
     }
 
     /**
