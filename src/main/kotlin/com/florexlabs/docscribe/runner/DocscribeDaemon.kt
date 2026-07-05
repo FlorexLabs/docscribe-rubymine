@@ -307,15 +307,7 @@ class DocscribeDaemon(
 
         val pb = ProcessBuilder(ruby, "-e", script).directory(File(gemRoot))
         val env = pb.environment()
-        val sdk = ProjectRootManager.getInstance(project).projectSdk
-        if (sdk?.homePath != null) {
-            val sdkBin = File(ruby).parentFile?.absolutePath
-            if (sdkBin != null) {
-                val currentPath = env["PATH"] ?: ""
-                env["PATH"] = "$sdkBin${File.pathSeparator}$currentPath"
-            }
-            env["BUNDLE_GEMFILE"] = File(gemRoot, "Gemfile").absolutePath
-        }
+        env.putAll(buildSdkEnvironment())
 
         val localGemPath = System.getProperty("docscribe.local.gem.path")
         if (localGemPath != null) {
@@ -395,6 +387,7 @@ class DocscribeDaemon(
             val pb =
                 ProcessBuilder("bundle", "exec", "docscribe", "--version")
                     .directory(File(gemRoot))
+            pb.environment().putAll(buildSdkEnvironment())
             pb.redirectErrorStream(true)
             val proc = pb.start()
             val exited = proc.waitFor(GEM_CHECK_TIMEOUT_SECONDS, TimeUnit.SECONDS)
@@ -505,6 +498,24 @@ class DocscribeDaemon(
     }
 
     /**
+     * Build environment variables that point `bundle` and `ruby` to the project's Ruby SDK.
+     *
+     * Prepends the SDK's `bin/` directory to `PATH` and sets `BUNDLE_GEMFILE`.
+     * Returns an empty map when no SDK is configured or the SDK binary is not found.
+     */
+    private fun buildSdkEnvironment(): Map<String, String> {
+        val ruby = rubyCommand() ?: return emptyMap()
+        val sdkBin = File(ruby).parentFile?.absolutePath ?: return emptyMap()
+        val currentPath = System.getenv("PATH") ?: ""
+        val env = mutableMapOf("PATH" to "$sdkBin${File.pathSeparator}$currentPath")
+        val gemRoot = DocscribeRunner.findProjectRoot(project.basePath ?: "")
+        if (gemRoot != null) {
+            env["BUNDLE_GEMFILE"] = File(gemRoot, "Gemfile").absolutePath
+        }
+        return env
+    }
+
+    /**
      * Perform a single JSON-RPC 2.0 call over a Unix domain socket.
      *
      * Serializes the request, writes it to the socket, reads the response, and parses it.
@@ -582,7 +593,9 @@ class DocscribeDaemon(
                 strategy = strategy,
                 formatJson = formatJson,
             )
-        return DocscribeRunner.runDocscribe(options, DefaultCommandExecutor())
+        val sdkEnv = buildSdkEnvironment()
+        val executor = if (sdkEnv.isEmpty()) DefaultCommandExecutor() else DefaultCommandExecutor(sdkEnv)
+        return DocscribeRunner.runDocscribe(options, executor)
     }
 
     /**
