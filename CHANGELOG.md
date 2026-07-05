@@ -16,6 +16,11 @@
 
 ### Changed
 
+- **Rapid annotations now discard stale results** — when the IDE triggers multiple checks for the
+  same file in quick succession (e.g. series of saves), each file has a generation counter. If a
+  newer check starts while an older one is still running, the older result is discarded on
+  completion. Only the last check's annotations are applied to the editor (see
+  `DocscribeAnnotator.fileGeneration`).
 - **All commands now use project Ruby SDK** — `bundle exec docscribe` (via `DocscribeRunner`
   and `DocscribeDaemon.fallback()`) and `bundle exec docscribe --version` (via
   `DocscribeDaemon.performGemCheck()`) now prepend the Ruby SDK's `bin/` directory to `PATH`
