@@ -6,7 +6,6 @@ import com.florexlabs.docscribe.runner.DocscribeOutputParser
 import com.florexlabs.docscribe.runner.DocscribeStrategy
 import com.florexlabs.docscribe.runner.RunOptions
 import com.florexlabs.docscribe.settings.DocscribeSettings
-import java.util.Objects
 import com.intellij.lang.annotation.AnnotationHolder
 import com.intellij.lang.annotation.ExternalAnnotator
 import com.intellij.lang.annotation.HighlightSeverity
@@ -16,6 +15,7 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.TextRange
 import com.intellij.psi.PsiDocumentManager
 import com.intellij.psi.PsiFile
+import java.util.Objects
 
 /**
  * Information collected by the annotator before running the background check.

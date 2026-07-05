@@ -5,7 +5,6 @@ import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import java.util.Objects
 
 class DocscribeAnnotatorCacheSettingsTest : BasePlatformTestCase() {
-
     private var savedHideCommentsByDefault = false
 
     override fun setUp() {
