@@ -99,34 +99,36 @@ class YardFoldingBuilder :
     }
 }
 
+private val yardTags =
+    listOf(
+        "@param",
+        "@return",
+        "@example",
+        "@raise",
+        "@see",
+        "@since",
+        "@version",
+        "@yield",
+        "@option",
+        "@overload",
+        "@note",
+        "@todo",
+        "@deprecated",
+        "@abstract",
+        "@attr_reader",
+        "@attr_writer",
+        "@attr_accessor",
+    )
+
 /**
  * Check whether a line contains any known YARD tag.
  *
  * Strips leading `#` and space characters, then checks for tag prefixes.
- * Recognises: @param, @return, @example, @raise, @see, @since, @version,
- * @yield, @option, @overload, @note, @todo, @deprecated, @abstract,
- * @attr_reader, @attr_writer, @attr_accessor.
  *
  * @param line A single line from the file (may include leading whitespace and `#`).
  * @return `true` if the line contains a recognised YARD tag.
  */
 private fun containsYardTag(line: String): Boolean {
     val trimmed = line.trimStart('#', ' ').trimStart()
-    return trimmed.startsWith("@param") ||
-        trimmed.startsWith("@return") ||
-        trimmed.startsWith("@example") ||
-        trimmed.startsWith("@raise") ||
-        trimmed.startsWith("@see") ||
-        trimmed.startsWith("@since") ||
-        trimmed.startsWith("@version") ||
-        trimmed.startsWith("@yield") ||
-        trimmed.startsWith("@option") ||
-        trimmed.startsWith("@overload") ||
-        trimmed.startsWith("@note") ||
-        trimmed.startsWith("@todo") ||
-        trimmed.startsWith("@deprecated") ||
-        trimmed.startsWith("@abstract") ||
-        trimmed.startsWith("@attr_reader") ||
-        trimmed.startsWith("@attr_writer") ||
-        trimmed.startsWith("@attr_accessor")
+    return yardTags.any { trimmed.startsWith(it) }
 }

@@ -148,24 +148,39 @@ object DocscribeOutputParser {
         val typeMismatchFiles = mutableListOf<String>()
         val errorFiles = mutableListOf<String>()
 
+        processOutputLines(lines, wouldUpdateFiles, typeMismatchFiles, errorFiles)
+
+        return TextParseResult(summary, wouldUpdateFiles, typeMismatchFiles, errorFiles)
+    }
+
+    /**
+     * Process lines after the summary, collecting would-update, type-mismatch and error entries.
+     *
+     * Mutates the provided lists directly. Tracks current "Would update:" file path and its
+     * change details across consecutive lines.
+     */
+    @Suppress("CyclomaticComplexMethod")
+    private fun processOutputLines(
+        lines: List<String>,
+        wouldUpdateFiles: MutableList<Pair<String, List<String>>>,
+        typeMismatchFiles: MutableList<String>,
+        errorFiles: MutableList<String>,
+    ) {
         var currentWouldUpdate: String? = null
         var currentDetails = mutableListOf<String>()
 
         for (line in lines) {
             when {
                 line.startsWith("Would update:") -> {
-                    if (currentWouldUpdate != null) {
-                        wouldUpdateFiles.add(currentWouldUpdate to currentDetails.toList())
-                        currentDetails = mutableListOf()
-                    }
+                    val prev = finalizeWouldUpdate(currentWouldUpdate, currentDetails)
+                    if (prev != null) wouldUpdateFiles.add(prev)
                     currentWouldUpdate = wouldUpdateRegex.find(line)?.groupValues?.getOrNull(1)
+                    currentDetails = mutableListOf()
                 }
 
-                changeDetailRegex.matches(line) -> {
+                changeDetailRegex.matches(line) && currentWouldUpdate != null -> {
                     val detail = changeDetailRegex.find(line)?.groupValues?.getOrNull(1)
-                    if (detail != null && currentWouldUpdate != null) {
-                        currentDetails.add(detail)
-                    }
+                    if (detail != null) currentDetails.add(detail)
                 }
 
                 line.startsWith("Type mismatches:") -> {
@@ -182,9 +197,19 @@ object DocscribeOutputParser {
         if (currentWouldUpdate != null) {
             wouldUpdateFiles.add(currentWouldUpdate to currentDetails.toList())
         }
-
-        return TextParseResult(summary, wouldUpdateFiles, typeMismatchFiles, errorFiles)
     }
+
+    /**
+     * Finalize a "Would update:" entry by pairing the file path with its details.
+     *
+     * @param filePath  The current file being tracked, or `null`.
+     * @param details   The details accumulated for this file.
+     * @return A pair of (filePath, details) if [filePath] is not null, or `null`.
+     */
+    private fun finalizeWouldUpdate(
+        filePath: String?,
+        details: MutableList<String>,
+    ): Pair<String, List<String>>? = if (filePath != null) filePath to details.toList() else null
 
     /**
      * Parse a single "Docscribe:" summary line into a [TextSummary].
@@ -195,35 +220,52 @@ object DocscribeOutputParser {
      * - UPDATED: `Docscribe: updated N file(s)`
      */
     private fun parseSummaryLine(line: String): TextSummary? {
-        okRegex.find(line)?.let { m ->
-            val inspected = m.groupValues[1].toIntOrNull() ?: 0
-            val typeMismatches = m.groupValues.getOrNull(2)?.toIntOrNull() ?: 0
-            return TextSummary(
-                status = "OK",
-                inspectedCount = inspected,
-                typeMismatchCount = typeMismatches,
-            )
-        }
-        failedRegex.find(line)?.let { m ->
-            return TextSummary(
-                status = "FAILED",
-                needsUpdateCount = m.groupValues[1].toIntOrNull() ?: 0,
-                typeMismatchCount = m.groupValues[2].toIntOrNull() ?: 0,
-                errorCount = m.groupValues[3].toIntOrNull() ?: 0,
-                okCount = m.groupValues[4].toIntOrNull() ?: 0,
-                inspectedCount =
-                    (m.groupValues[1].toIntOrNull() ?: 0) +
-                        (m.groupValues[2].toIntOrNull() ?: 0) +
-                        (m.groupValues[3].toIntOrNull() ?: 0) +
-                        (m.groupValues[4].toIntOrNull() ?: 0),
-            )
-        }
-        updatedRegex.find(line)?.let { m ->
-            return TextSummary(
-                status = "UPDATED",
-                updatedCount = m.groupValues[1].toIntOrNull() ?: 0,
-            )
-        }
+        okRegex.find(line)?.let { m -> return parseOkSummary(m) }
+        failedRegex.find(line)?.let { m -> return parseFailedSummary(m) }
+        updatedRegex.find(line)?.let { m -> return parseUpdatedSummary(m) }
         return null
     }
+
+    /**
+     * Parse an "OK" summary line into a [TextSummary].
+     *
+     * Format: `Docscribe: OK (N files checked, M type mismatches)`.
+     */
+    private fun parseOkSummary(m: MatchResult): TextSummary =
+        TextSummary(
+            status = "OK",
+            inspectedCount = m.groupValues[1].toIntOrNull() ?: 0,
+            typeMismatchCount = m.groupValues.getOrNull(2)?.toIntOrNull() ?: 0,
+        )
+
+    /**
+     * Parse a "FAILED" summary line into a [TextSummary].
+     *
+     * Format: `Docscribe: FAILED (N need updates, M type mismatches, E errors, O ok)`.
+     */
+    private fun parseFailedSummary(m: MatchResult): TextSummary {
+        val needsUpdate = m.groupValues[1].toIntOrNull() ?: 0
+        val typeMismatches = m.groupValues[2].toIntOrNull() ?: 0
+        val errors = m.groupValues[3].toIntOrNull() ?: 0
+        val ok = m.groupValues[4].toIntOrNull() ?: 0
+        return TextSummary(
+            status = "FAILED",
+            needsUpdateCount = needsUpdate,
+            typeMismatchCount = typeMismatches,
+            errorCount = errors,
+            okCount = ok,
+            inspectedCount = needsUpdate + typeMismatches + errors + ok,
+        )
+    }
+
+    /**
+     * Parse an "UPDATED" summary line into a [TextSummary].
+     *
+     * Format: `Docscribe: updated N file(s)`.
+     */
+    private fun parseUpdatedSummary(m: MatchResult): TextSummary =
+        TextSummary(
+            status = "UPDATED",
+            updatedCount = m.groupValues[1].toIntOrNull() ?: 0,
+        )
 }
