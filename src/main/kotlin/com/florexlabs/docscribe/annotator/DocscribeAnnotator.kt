@@ -59,7 +59,7 @@ class DocscribeAnnotator : ExternalAnnotator<AnnotatorFileInfo, DocscribeOutput>
         editor: Editor,
         hasErrors: Boolean,
     ): AnnotatorFileInfo? {
-        if (!file.name.endsWith(".rb") && !file.name.endsWith(".rake")) return null
+        if (!file.name.endsWith(".rb") && !file.name.endsWith(".rake") && file.name != "Rakefile") return null
         val vFile = file.virtualFile ?: return null
         val projectDir = file.project.basePath ?: return null
 
@@ -86,7 +86,7 @@ class DocscribeAnnotator : ExternalAnnotator<AnnotatorFileInfo, DocscribeOutput>
      * @return [AnnotatorFileInfo] if the file should be checked, or `null` to skip.
      */
     override fun collectInformation(file: PsiFile): AnnotatorFileInfo? {
-        if (!file.name.endsWith(".rb") && !file.name.endsWith(".rake")) return null
+        if (!file.name.endsWith(".rb") && !file.name.endsWith(".rake") && file.name != "Rakefile") return null
         val vFile = file.virtualFile ?: return null
         val projectDir = file.project.basePath ?: return null
 

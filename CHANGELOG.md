@@ -4,6 +4,9 @@
 
 ### Added
 
+- **Rakefile support (no extension)** — all annotators, actions, and intention actions now accept
+  a file named `Rakefile` (without `.rb` or `.rake` extension) in addition to `.rb` and `.rake`
+  files. This ensures the plugin works on standard Rakefiles that have no file extension.
 - **Graceful handling when docscribe gem not installed** — `DocscribeDaemon` now runs
   `bundle exec docscribe --version` once on first use and caches the result. If the gem is missing, a
   user-friendly notification (with "Open Gemfile" action) is shown once, and all operations return a

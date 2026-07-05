@@ -23,6 +23,12 @@ class DocscribeAnnotatorTest : BasePlatformTestCase() {
         assertNotNull(info)
     }
 
+    fun testAnnotatorReturnsInfoForPlainRakefile() {
+        val file = myFixture.configureByText("Rakefile", "task :test do\nend")
+        val info = DocscribeAnnotator().collectInformation(file)
+        assertNotNull(info)
+    }
+
     fun testNoEditorOverloadReturnsInfo() {
         val file = myFixture.configureByText("test.rb", "class Foo\nend")
         val info = DocscribeAnnotator().collectInformation(file)
