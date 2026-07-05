@@ -101,7 +101,7 @@ class DocscribeDaemonGemTest : BasePlatformTestCase() {
         // No server mode — should trigger CLI fallback, which needs a Gemfile
         // Since there's no Gemfile in test, ensureRunning returns null,
         // fallback() sees MISSING stub but status is AVAILABLE…
-        // Actually this tests the path through execute → ensureRunning → null → fallback
+        // Actually this tests the path through execute -> ensureRunning -> null -> fallback
         val result = daemon.execute("check", file = "test.rb", projectDir = "/tmp")
         // Without a Gemfile, fallback may fail — just ensure no crash
         assertNotNull(result)
