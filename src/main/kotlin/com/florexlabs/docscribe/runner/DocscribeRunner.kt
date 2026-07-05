@@ -83,7 +83,9 @@ interface CommandExecutor {
  *
  * Applies a 120-second timeout. Exit code 2 is treated as a failure (indistinguishable from timeout).
  */
-class DefaultCommandExecutor : CommandExecutor {
+class DefaultCommandExecutor(
+    private val environment: Map<String, String> = emptyMap(),
+) : CommandExecutor {
     override fun execute(
         cmd: String,
         args: List<String>,
@@ -93,6 +95,7 @@ class DefaultCommandExecutor : CommandExecutor {
             GeneralCommandLine(cmd)
                 .withParameters(args)
                 .withWorkDirectory(cwd)
+                .withEnvironment(environment)
         val handler = CapturingProcessHandler(commandLine)
         val output =
             try {

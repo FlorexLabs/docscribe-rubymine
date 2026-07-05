@@ -16,6 +16,11 @@
 
 ### Changed
 
+- **All commands now use project Ruby SDK** — `bundle exec docscribe` (via `DocscribeRunner`
+  and `DocscribeDaemon.fallback()`) and `bundle exec docscribe --version` (via
+  `DocscribeDaemon.performGemCheck()`) now prepend the Ruby SDK's `bin/` directory to `PATH`
+  and set `BUNDLE_GEMFILE`. This ensures the SDK's Ruby and Bundler are used instead of system
+  defaults. Extracted shared `buildSdkEnvironment()` helper, also reused in server startup.
 - **`com.intellij.modules.ruby` made optional** — changed from hard `<depends>` to
   `<depends optional="true" config-file="withRubyPlugin.xml">`. Ruby-specific extensions
   (`ExternalAnnotator`, `FoldingBuilder`, `DependencySupport`, `IntentionAction`) moved to a new
