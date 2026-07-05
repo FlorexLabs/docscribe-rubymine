@@ -70,7 +70,8 @@ class SafeFixAction : AnAction() {
      */
     override fun update(e: AnActionEvent) {
         val file = e.getData(CommonDataKeys.VIRTUAL_FILE)
-        e.presentation.isEnabledAndVisible = file != null && (file.name.endsWith(".rb") || file.name.endsWith(".rake"))
+        e.presentation.isEnabledAndVisible =
+            file != null && (file.name.endsWith(".rb") || file.name.endsWith(".rake") || file.name == "Rakefile")
     }
 
     /**
