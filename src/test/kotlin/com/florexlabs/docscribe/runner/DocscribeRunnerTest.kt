@@ -87,6 +87,26 @@ class DocscribeRunnerTest {
     }
 
     @Test
+    fun `DefaultCommandExecutor with environment does not throw`() {
+        val executor = DefaultCommandExecutor(mapOf("PATH" to "/test/bin:/usr/bin"))
+        val tempDir = createTempDirectory().toFile()
+        try {
+            File(tempDir, "Gemfile").writeText(
+                """
+                source "https://rubygems.org"
+                gem "docscribe"
+                """.trimIndent(),
+            )
+            DocscribeRunner.runDocscribe(
+                RunOptions(projectDir = tempDir.absolutePath, strategy = DocscribeStrategy.CHECK),
+                executor,
+            )
+        } finally {
+            tempDir.deleteRecursively()
+        }
+    }
+
+    @Test
     fun `runDocscribe with no file uses no file arg`() {
         val executor = RecordingExecutor()
         DocscribeRunner.runDocscribe(

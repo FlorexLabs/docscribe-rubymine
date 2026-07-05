@@ -82,6 +82,10 @@ interface CommandExecutor {
  * Default [CommandExecutor] that uses IntelliJ's [GeneralCommandLine] and [CapturingProcessHandler].
  *
  * Applies a 120-second timeout. Exit code 2 is treated as a failure (indistinguishable from timeout).
+ *
+ * @property environment Environment variables to pass to the child process.
+ *   Merged with the parent process environment; keys in this map take precedence.
+ *   Use to inject SDK paths (e.g. prepend Ruby SDK bin dir to `PATH`).
  */
 class DefaultCommandExecutor(
     private val environment: Map<String, String> = emptyMap(),
