@@ -85,8 +85,7 @@ class YardFoldingBuilder :
     /**
      * The placeholder text shown for a folded YARD comment region.
      */
-    @Suppress("NullableReturnType")
-    override fun getPlaceholderText(node: ASTNode): String? = " // ..."
+    override fun getPlaceholderText(node: ASTNode): String = " // ..."
 
     /**
      * Whether YARD comment regions should be collapsed by default.
