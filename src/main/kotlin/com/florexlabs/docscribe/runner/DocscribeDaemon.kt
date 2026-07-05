@@ -4,10 +4,15 @@ import com.google.gson.GsonBuilder
 import com.intellij.notification.NotificationGroupManager
 import com.intellij.notification.NotificationType
 import com.intellij.openapi.Disposable
+import com.intellij.openapi.actionSystem.AnAction
+import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.diagnostic.Logger
+import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.roots.ProjectRootManager
+import com.intellij.openapi.vfs.LocalFileSystem
+import org.jetbrains.annotations.VisibleForTesting
 import java.io.File
 import java.io.IOException
 import java.net.StandardProtocolFamily
@@ -22,10 +27,18 @@ import kotlin.concurrent.Volatile
 /**
  * Project-level service managing a long-running docscribe server process over Unix domain socket RPC.
  *
- * Uses JSON-RPC 2.0 over a Unix socket to communicate with a headless docscribe server.
- * Falls back to direct CLI execution ([DocscribeRunner.runDocscribe]) if the server is unavailable.
+ * ## Gem availability
+ * On first use, runs `bundle exec docscribe --version` to verify the gem is installed
+ * ([performGemCheck]). The result is cached in [docscribeStatus] for the session.
+ * If the gem is missing, a user notification with "Open Gemfile" action is shown once,
+ * and all subsequent calls return a descriptive error without retrying.
  *
- * Supported RPC methods:
+ * ## Execution
+ * Uses JSON-RPC 2.0 over a Unix socket to communicate with a headless docscribe server.
+ * Falls back to direct CLI execution ([DocscribeRunner.runDocscribe]) if the server is
+ * unavailable or the gem is known missing.
+ *
+ * ## RPC methods
  * - `check` — dry-run diagnostics.
  * - `fix` — with `"strategy": "safe"` or `"aggressive"`.
  * - `ping` — health check.
@@ -46,6 +59,24 @@ class DocscribeDaemon(
 
     @Volatile
     private var alive = false
+
+    /**
+     * Whether the `docscribe` gem is available in the project.
+     *
+     * - [DocscribeStatus.UNCHECKED] — not yet verified (initial state).
+     * - [DocscribeStatus.AVAILABLE] — `bundle exec docscribe --version` succeeded.
+     * - [DocscribeStatus.MISSING] — gem not found; don't retry this session.
+     */
+    @Volatile
+    @VisibleForTesting
+    internal var docscribeStatus = DocscribeStatus.UNCHECKED
+
+    /** True once a "gem not found" notification has been shown this session. */
+    @Volatile
+    private var missingNotified = false
+
+    /** Tracks whether the `docscribe` gem is installed in the project. */
+    enum class DocscribeStatus { UNCHECKED, AVAILABLE, MISSING }
 
     /**
      * Internal handle holding the server process and its Unix socket path.
@@ -212,6 +243,14 @@ class DocscribeDaemon(
         val existing = server
         if (existing != null && alive) return existing
 
+        // One-time check: is the docscribe gem available?
+        if (docscribeStatus == DocscribeStatus.UNCHECKED) {
+            performGemCheck()
+        }
+        if (docscribeStatus == DocscribeStatus.MISSING) {
+            return null
+        }
+
         val ruby = rubyCommand()
         val gemRoot = if (ruby != null) DocscribeRunner.findProjectRoot(projectDir ?: project.basePath ?: "") else null
         val proc = if (gemRoot != null) startServerProcess(ruby!!, gemRoot) else null
@@ -336,6 +375,81 @@ class DocscribeDaemon(
     }
 
     /**
+     * Check whether `bundle exec docscribe --version` succeeds.
+     *
+     * Caches the result in [docscribeStatus] so the check runs only once per session.
+     * Shows a user-friendly notification (with "Open Gemfile" action) on first failure.
+     */
+    @VisibleForTesting
+    internal fun performGemCheck() {
+        if (docscribeStatus != DocscribeStatus.UNCHECKED) return
+        docscribeStatus = DocscribeStatus.MISSING // pessimistic default
+
+        val gemRoot = DocscribeRunner.findProjectRoot(project.basePath ?: "")
+        if (gemRoot == null) {
+            if (!missingNotified) showMissingDocscribeNotification(project.basePath ?: "")
+            return
+        }
+
+        try {
+            val pb =
+                ProcessBuilder("bundle", "exec", "docscribe", "--version")
+                    .directory(File(gemRoot))
+            pb.redirectErrorStream(true)
+            val proc = pb.start()
+            val exited = proc.waitFor(GEM_CHECK_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+            if (!exited) {
+                proc.destroyForcibly()
+                log.warn("docscribe version check timed out after ${GEM_CHECK_TIMEOUT_SECONDS}s")
+                return
+            }
+            if (proc.exitValue() == 0) {
+                docscribeStatus = DocscribeStatus.AVAILABLE
+                log.info("docscribe gem detected (version check passed)")
+            } else {
+                val output = proc.inputStream.bufferedReader().readText()
+                log.warn("docscribe version check failed: exit ${proc.exitValue()}, output: $output")
+            }
+        } catch (e: IOException) {
+            log.warn("Failed to run docscribe version check", e)
+        }
+
+        if (docscribeStatus == DocscribeStatus.MISSING && !missingNotified) {
+            showMissingDocscribeNotification(gemRoot)
+        }
+    }
+
+    /**
+     * Show a one-time error notification that the docscribe gem is missing,
+     * with a quick-action to open the project Gemfile.
+     */
+    private fun showMissingDocscribeNotification(gemRoot: String) {
+        missingNotified = true
+        val message =
+            "docscribe gem not found in project Gemfile. " +
+                "Add 'gem \"docscribe\"' and run 'bundle install'."
+        val notification =
+            NotificationGroupManager
+                .getInstance()
+                .getNotificationGroup("DocScribe")
+                .createNotification(message, NotificationType.ERROR)
+        notification.addAction(
+            object : AnAction("Open Gemfile") {
+                override fun actionPerformed(e: AnActionEvent) {
+                    val gemFile = File(gemRoot, "Gemfile")
+                    if (gemFile.exists()) {
+                        val vFile = LocalFileSystem.getInstance().refreshAndFindFileByIoFile(gemFile)
+                        if (vFile != null) {
+                            FileEditorManager.getInstance(project).openFile(vFile, true)
+                        }
+                    }
+                }
+            },
+        )
+        notification.notify(project)
+    }
+
+    /**
      * Resolve the Ruby executable path, preferring the project SDK if configured.
      *
      * Falls back to `PATH` lookup, then to `~/.rbenv/shims/ruby`.
@@ -449,6 +563,17 @@ class DocscribeDaemon(
         projectDir: String?,
         formatJson: Boolean,
     ): RunResult {
+        if (docscribeStatus == DocscribeStatus.MISSING) {
+            return RunResult(
+                success = false,
+                hasIssues = false,
+                exitCode = 2,
+                stdout = "",
+                stderr =
+                    "docscribe gem is not installed. " +
+                        "Add 'gem \"docscribe\"' to your Gemfile and run 'bundle install'.",
+            )
+        }
         val strategy = strategyFromCommand(command)
         val options =
             RunOptions(
@@ -490,6 +615,7 @@ class DocscribeDaemon(
         private const val OUTPUT_TRIM_LENGTH = 500
         private const val RPC_BUFFER_SIZE = 65536
         private const val RUBY_PATH_LOOKUP_TIMEOUT_SECONDS = 3L
+        private const val GEM_CHECK_TIMEOUT_SECONDS = 10L
         private val sharedGson by lazy { GsonBuilder().create() }
 
         /**
