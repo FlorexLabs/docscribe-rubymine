@@ -109,6 +109,11 @@
             text="Update Types from RBS"
             description="Run docscribe update_types to refresh YARD docs from RBS signatures"/>
 
+    <action id="com.florexlabs.docscribe.DoctorAction"
+            class="com.florexlabs.docscribe.actions.DoctorAction"
+            text="DocScribe Doctor"
+            description="Diagnose DocScribe plugin setup (Ruby SDK, gem, daemon)"/>
+
     <group id="com.florexlabs.docscribe.DocScribeGroup"
            text="DocScribe" popup="true"
            icon="/com/florexlabs/docscribe/icons/docscribe.png">
@@ -120,6 +125,8 @@
       <separator/>
       <reference ref="com.florexlabs.docscribe.CheckWorkspaceAction"/>
       <reference ref="com.florexlabs.docscribe.UpdateTypesAction"/>
+      <separator/>
+      <reference ref="com.florexlabs.docscribe.DoctorAction"/>
     </group>
   </actions>
 </idea-plugin>

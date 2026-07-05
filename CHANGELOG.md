@@ -4,6 +4,10 @@
 
 ### Added
 
+- **Doctor diagnostics action** — new `DoctorAction` that collects and displays plugin setup diagnostics:
+  project root, Gemfile status, Ruby SDK path, docscribe gem version, daemon server state, and
+  settings. Accessible from Editor Popup  DocScribe  DocScribe Doctor. Reports actionable steps
+  for common issues (missing gem, no SDK, no Gemfile).
 - **Capability detection for docscribe version** — `performGemCheck()` now parses `--version` output
   and stores parsed version + capabilities (`serverMode` for ≥ 1.5.1). `ensureRunning()` skips
   server startup when version < 1.5.1, falling back directly to CLI. New `parseVersion()` utility

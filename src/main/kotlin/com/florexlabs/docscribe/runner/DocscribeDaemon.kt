@@ -110,6 +110,38 @@ class DocscribeDaemon(
         val process: Process,
     )
 
+    // -- Public diagnostics accessors --
+
+    /**
+     * The Ruby executable path resolved for this project.
+     *
+     * @return Absolute path to Ruby, or `null` if not found.
+     */
+    fun getRubyPath(): String? = rubyCommand()
+
+    /**
+     * Current docscribe gem availability status.
+     *
+     * @return [DocscribeStatus] — UNCHECKED, AVAILABLE, or MISSING.
+     */
+    fun getDocscribeStatus(): DocscribeStatus = docscribeStatus
+
+    /**
+     * Parsed docscribe capabilities (version + server mode support).
+     *
+     * @return Capabilities if gem was detected, `null` otherwise.
+     */
+    fun getCapabilities(): DocscribeCapabilities? = capabilities
+
+    /**
+     * Whether the docscribe daemon server is currently running and alive.
+     *
+     * @return `true` if the server process is active.
+     */
+    fun isServerRunning(): Boolean = server != null && alive
+
+    // -- RPC execution --
+
     /**
      * Execute an RPC command against the server, falling back to CLI if needed.
      *
