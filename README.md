@@ -27,7 +27,7 @@
 
 **DocScribe** is a RubyMine plugin that auto-generates inline YARD documentation for Ruby methods
 using [docscribe](https://github.com/unurgunite/docscribe) — a Ruby gem that analyzes AST and suggests YARD-compatible
-documentation. Compatible with **docscribe >= 1.4.0** (daemon mode requires >= 1.5.0).
+documentation. Compatible with **docscribe >= 1.4.0** (daemon mode requires >= 1.5.1).
 
 > Also, available for [VS Code](https://github.com/FlorexLabs/docscribe-vscode) on
 > the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=FlorexLabs.docscribe).
@@ -60,7 +60,8 @@ documentation. Compatible with **docscribe >= 1.4.0** (daemon mode requires >= 1
 - **Update types from RBS** — refresh YARD docs from RBS signatures
 - **Collapsible YARD docs** — fold all YARD comment blocks automatically on file open (configurable in settings)
 - **Configurable** — hide comments by default
-- **`.rake` support** — diagnostics and actions work on Rake files
+- **`.rake` and `Rakefile` support** — diagnostics and actions work on Rake files and bare Rakefiles
+- **Automatic backend selection** — detects docscribe version on first use, chooses daemon (>= 1.5.1) or CLI fallback
 - **JSON output** — uses `docscribe --format json` for reliable diagnostics parsing
 
 ## Requirements
@@ -73,11 +74,11 @@ documentation. Compatible with **docscribe >= 1.4.0** (daemon mode requires >= 1
 
 | Mode                     | docscribe version | Ruby version |
 |--------------------------|-------------------|--------------|
-| Daemon (Unix socket RPC) | >= 1.5.0          | >= 3.0       |
+| Daemon (Unix socket RPC) | >= 1.5.1          | >= 3.0       |
 | CLI fallback             | >= 1.4.0          | >= 2.7       |
 
-The plugin prefers daemon mode for better performance. If `docscribe < 1.5.0` or the Ruby SDK is unavailable, it
-automatically falls back to spawning the CLI directly.
+The plugin automatically selects the backend based on the detected docscribe version: daemon mode for >= 1.5.1,
+CLI fallback for older versions. If the Ruby SDK is unavailable, it falls back to system PATH Ruby.
 
 ```bash
 gem install docscribe
