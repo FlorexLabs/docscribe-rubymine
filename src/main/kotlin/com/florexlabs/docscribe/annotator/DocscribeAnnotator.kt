@@ -5,6 +5,7 @@ import com.florexlabs.docscribe.runner.DocscribeOutput
 import com.florexlabs.docscribe.runner.DocscribeOutputParser
 import com.florexlabs.docscribe.runner.DocscribeStrategy
 import com.florexlabs.docscribe.runner.RunOptions
+import com.florexlabs.docscribe.settings.DocscribeSettings
 import com.intellij.lang.annotation.AnnotationHolder
 import com.intellij.lang.annotation.ExternalAnnotator
 import com.intellij.lang.annotation.HighlightSeverity
@@ -14,9 +15,14 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.TextRange
 import com.intellij.psi.PsiDocumentManager
 import com.intellij.psi.PsiFile
+import java.util.Objects
 
 /**
  * Information collected by the annotator before running the background check.
+ *
+ * @property configHash Hash of [DocscribeSettings] used as part of the cache key.
+ *   When settings change, the hash changes, causing cache misses and forcing re-annotation
+ *   with the new settings.
  */
 data class AnnotatorFileInfo(
     val filePath: String,
@@ -31,6 +37,11 @@ data class AnnotatorFileInfo(
  *
  * Triggers automatically when a Ruby file is opened or saved. Uses JSON output for structured parsing.
  * Skips unsaved documents (docscribe reads from disk) and caches results by file modification stamp.
+ *
+ * Cache invalidation: the [AnnotatorFileInfo.configHash] is derived from [DocscribeSettings],
+ * so changing settings (e.g. `hideCommentsByDefault`) automatically invalidates cached annotations
+ * by producing a different configHash. The DocscribeSettingsChangeListener also clears the cache
+ * explicitly on settings change.
  */
 class DocscribeAnnotator : ExternalAnnotator<AnnotatorFileInfo, DocscribeOutput>() {
     /**
@@ -55,7 +66,7 @@ class DocscribeAnnotator : ExternalAnnotator<AnnotatorFileInfo, DocscribeOutput>
         // Skip unsaved documents — docscribe reads from disk, not from editor buffer
         if (FileDocumentManager.getInstance().isDocumentUnsaved(editor.document)) return null
 
-        val configHash = 0
+        val configHash = Objects.hash(DocscribeSettings.getInstance().hideCommentsByDefault)
 
         return AnnotatorFileInfo(
             filePath = vFile.path,
@@ -79,7 +90,7 @@ class DocscribeAnnotator : ExternalAnnotator<AnnotatorFileInfo, DocscribeOutput>
         val vFile = file.virtualFile ?: return null
         val projectDir = file.project.basePath ?: return null
 
-        val configHash = 0
+        val configHash = Objects.hash(DocscribeSettings.getInstance().hideCommentsByDefault)
 
         return AnnotatorFileInfo(
             filePath = vFile.path,
