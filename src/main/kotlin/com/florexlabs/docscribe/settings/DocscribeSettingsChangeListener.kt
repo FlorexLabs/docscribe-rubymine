@@ -1,5 +1,6 @@
 package com.florexlabs.docscribe.settings
 
+import com.florexlabs.docscribe.annotator.DocscribeAnnotatorCache
 import com.intellij.codeInsight.folding.CodeFoldingManager
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.Service
@@ -45,11 +46,13 @@ internal class DocscribeSettingsChangeListenerImpl : DocscribeSettingsChangeList
     }
 
     /**
-     * Refresh code folding in all open editors when settings change.
+     * Clear annotation cache and refresh code folding in all open editors when settings change.
      *
-     * Iterates all open projects and their text editors, triggering an async folding region update.
+     * Cache invalidation ensures annotations are regenerated with the new settings.
+     * Folding refresh updates YARD comment collapse state.
      */
     override fun settingsChanged() {
+        DocscribeAnnotatorCache.getInstance().clear()
         for (project in ProjectManager.getInstance().openProjects) {
             if (project.isDisposed) continue
             val fileEditorManager = FileEditorManager.getInstance(project)

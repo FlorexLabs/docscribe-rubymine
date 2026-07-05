@@ -18,7 +18,17 @@
   (`ExternalAnnotator`, `FoldingBuilder`, `DependencySupport`, `IntentionAction`) moved to a new
   secondary descriptor. Plugin now installs on IntelliJ IDEA without Ruby plugin (limited
   functionality), unblocking Marketplace publication.
+- **Annotation cache now respects settings** — `configHash` in `AnnotatorFileInfo` is now derived
+  from `DocscribeSettings.hideCommentsByDefault` instead of being hardcoded to `0`. Changing
+  settings automatically invalidates cached annotations. Cache also has a max size (1000 entries)
+  with LRU-like eviction.
 - **Version** bumped from `0.1.4` to `0.1.5`.
+
+### Fixed
+
+- **Annotation cache never invalidated on settings change** — `DocscribeSettingsChangeListener`
+  now calls `DocscribeAnnotatorCache.clear()` when settings are saved, in addition to refreshing
+  code folding.
 
 ### Build
 
