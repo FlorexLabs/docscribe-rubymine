@@ -19,6 +19,30 @@
     ]]></description>
 
   <change-notes><![CDATA[
+        <h3>0.1.5</h3>
+        <h4>Added</h4>
+        <ul>
+            <li>Doctor diagnostics action — menu entry showing Ruby SDK, Gemfile, docscribe gem, daemon state, settings</li>
+            <li>Rakefile support (no extension) — all actions and annotations work on <code>Rakefile</code> files</li>
+            <li>Capability detection — docscribe version parsed on startup; server mode skipped for &lt; 1.5.1</li>
+            <li>Graceful handling when docscribe gem not installed — notification with &ldquo;Open Gemfile&rdquo; action</li>
+        </ul>
+        <h4>Changed</h4>
+        <ul>
+            <li><code>com.intellij.modules.ruby</code> made optional — plugin installs on IntelliJ IDEA (limited), unblocks Marketplace</li>
+            <li>All commands use project Ruby SDK — SDK <code>bin/</code> on <code>PATH</code>, <code>BUNDLE_GEMFILE</code> set</li>
+            <li>Concurrency guard for rapid annotations — per-file generation discards stale results</li>
+            <li>Annotation cache respects settings — <code>configHash</code> derived from <code>hideCommentsByDefault</code></li>
+            <li>Version bumped from <code>0.1.4</code> to <code>0.1.5</code></li>
+        </ul>
+        <h4>Fixed</h4>
+        <ul>
+            <li>Annotation cache not invalidated on settings change — added clear on save</li>
+        </ul>
+        <h4>Build</h4>
+        <ul>
+            <li><code>intellijDependencies()</code> added to repository section in <code>build.gradle.kts</code></li>
+        </ul>
         <h3>0.1.4</h3>
         <h4>Fixed</h4>
         <ul>
@@ -45,11 +69,11 @@
         </ul>
     ]]></change-notes>
 
-  <version>0.1.4</version>
+  <version>0.1.5</version>
   <idea-version since-build="261" until-build="261.*"/>
 
   <depends>com.intellij.modules.platform</depends>
-  <depends>com.intellij.modules.ruby</depends>
+  <depends optional="true" config-file="withRubyPlugin.xml">com.intellij.modules.ruby</depends>
 
   <extensions defaultExtensionNs="com.intellij">
     <applicationService serviceImplementation="com.florexlabs.docscribe.settings.DocscribeSettings"/>
@@ -59,33 +83,12 @@
 
     <notificationGroup id="DocScribe" displayType="BALLOON" key="DocScribe notifications"/>
 
-    <externalAnnotator language="Ruby"
-                       implementationClass="com.florexlabs.docscribe.annotator.DocscribeAnnotator"/>
-
     <applicationConfigurable
       groupId="tools"
       displayName="DocScribe"
       id="com.florexlabs.docscribe.settings"
       instance="com.florexlabs.docscribe.settings.DocscribeSettingsConfigurable"/>
 
-    <lang.foldingBuilder language="ruby" order="first"
-                         implementationClass="com.florexlabs.docscribe.folding.YardFoldingBuilder"/>
-
-    <dependencySupport kind="ruby" coordinate="docscribe" displayName="docscribe gem"/>
-    <dependencySupport kind="ruby" coordinate="rbs" displayName="RBS"/>
-
-    <intentionAction>
-      <className>com.florexlabs.docscribe.annotator.DocscribeFixIntention</className>
-      <category>DocScribe</category>
-    </intentionAction>
-    <intentionAction>
-      <className>com.florexlabs.docscribe.annotator.DocscribeAggressiveFixIntention</className>
-      <category>DocScribe</category>
-    </intentionAction>
-    <intentionAction>
-      <className>com.florexlabs.docscribe.annotator.DocscribeCheckIntention</className>
-      <category>DocScribe</category>
-    </intentionAction>
   </extensions>
 
   <actions>
@@ -130,6 +133,11 @@
             text="Update Types from RBS"
             description="Run docscribe update_types to refresh YARD docs from RBS signatures"/>
 
+    <action id="com.florexlabs.docscribe.DoctorAction"
+            class="com.florexlabs.docscribe.actions.DoctorAction"
+            text="DocScribe Doctor"
+            description="Diagnose DocScribe plugin setup (Ruby SDK, gem, daemon)"/>
+
     <group id="com.florexlabs.docscribe.DocScribeGroup"
            text="DocScribe" popup="true"
            icon="/com/florexlabs/docscribe/icons/docscribe.png">
@@ -141,6 +149,8 @@
       <separator/>
       <reference ref="com.florexlabs.docscribe.CheckWorkspaceAction"/>
       <reference ref="com.florexlabs.docscribe.UpdateTypesAction"/>
+      <separator/>
+      <reference ref="com.florexlabs.docscribe.DoctorAction"/>
     </group>
   </actions>
 </idea-plugin>

@@ -38,7 +38,7 @@ class DocscribeAggressiveFixIntention : IntentionAction {
         project: Project,
         editor: Editor?,
         file: PsiFile?,
-    ): Boolean = file != null && (file.name.endsWith(".rb") || file.name.endsWith(".rake"))
+    ): Boolean = file != null && (file.name.endsWith(".rb") || file.name.endsWith(".rake") || file.name == "Rakefile")
 
     /**
      * Run docscribe aggressive fix in a background task, then refresh the file on success.

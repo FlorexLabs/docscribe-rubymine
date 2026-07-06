@@ -1,0 +1,25 @@
+<idea-plugin>
+  <extensions defaultExtensionNs="com.intellij">
+    <externalAnnotator language="Ruby"
+                       implementationClass="com.florexlabs.docscribe.annotator.DocscribeAnnotator"/>
+
+    <lang.foldingBuilder language="ruby" order="first"
+                         implementationClass="com.florexlabs.docscribe.folding.YardFoldingBuilder"/>
+
+    <dependencySupport kind="ruby" coordinate="docscribe" displayName="docscribe gem"/>
+    <dependencySupport kind="ruby" coordinate="rbs" displayName="RBS"/>
+
+    <intentionAction>
+      <className>com.florexlabs.docscribe.annotator.DocscribeFixIntention</className>
+      <category>DocScribe</category>
+    </intentionAction>
+    <intentionAction>
+      <className>com.florexlabs.docscribe.annotator.DocscribeAggressiveFixIntention</className>
+      <category>DocScribe</category>
+    </intentionAction>
+    <intentionAction>
+      <className>com.florexlabs.docscribe.annotator.DocscribeCheckIntention</className>
+      <category>DocScribe</category>
+    </intentionAction>
+  </extensions>
+</idea-plugin>

@@ -1,5 +1,62 @@
 # Changelog
 
+## [0.1.5] — 2026-07-06
+
+### Added
+
+- **Doctor diagnostics action** — new `DoctorAction` that collects and displays plugin setup diagnostics:
+  project root, Gemfile status, Ruby SDK path, docscribe gem version, daemon server state, and
+  settings. Accessible from Editor Popup  DocScribe  DocScribe Doctor. Reports actionable steps
+  for common issues (missing gem, no SDK, no Gemfile).
+- **Capability detection for docscribe version** — `performGemCheck()` now parses `--version` output
+  and stores parsed version + capabilities (`serverMode` for ≥ 1.5.1). `ensureRunning()` skips
+  server startup when version < 1.5.1, falling back directly to CLI. New `parseVersion()` utility
+  in companion object with 8 unit tests.
+- **Rakefile support (no extension)** — all annotators, actions, and intention actions now accept
+  a file named `Rakefile` (without `.rb` or `.rake` extension) in addition to `.rb` and `.rake`
+  files. This ensures the plugin works on standard Rakefiles that have no file extension.
+- **Graceful handling when docscribe gem not installed** — `DocscribeDaemon` now runs
+  `bundle exec docscribe --version` once on first use and caches the result. If the gem is missing, a
+  user-friendly notification (with "Open Gemfile" action) is shown once, and all operations return a
+  clear error: *"Add 'gem \"docscribe\"' to your Gemfile and run 'bundle install'"*.
+- **Tests for gem availability check** — 5 new tests in `DocscribeDaemonGemTest.kt` covering MISSING
+  status, error message format, all command types, and status caching.
+
+### Changed
+
+- **Rapid annotations now discard stale results** — when the IDE triggers multiple checks for the
+  same file in quick succession (e.g. series of saves), each file has a generation counter. If a
+  newer check starts while an older one is still running, the older result is discarded on
+  completion. Only the last check's annotations are applied to the editor (see
+  `DocscribeAnnotator.fileGeneration`).
+- **All commands now use project Ruby SDK** — `bundle exec docscribe` (via `DocscribeRunner`
+  and `DocscribeDaemon.fallback()`) and `bundle exec docscribe --version` (via
+  `DocscribeDaemon.performGemCheck()`) now prepend the Ruby SDK's `bin/` directory to `PATH`
+  and set `BUNDLE_GEMFILE`. This ensures the SDK's Ruby and Bundler are used instead of system
+  defaults. Extracted shared `buildSdkEnvironment()` helper, also reused in server startup.
+- **`com.intellij.modules.ruby` made optional** — changed from hard `<depends>` to
+  `<depends optional="true" config-file="withRubyPlugin.xml">`. Ruby-specific extensions
+  (`ExternalAnnotator`, `FoldingBuilder`, `DependencySupport`, `IntentionAction`) moved to a new
+  secondary descriptor. Plugin now installs on IntelliJ IDEA without Ruby plugin (limited
+  functionality), unblocking Marketplace publication.
+- **Annotation cache now respects settings** — `configHash` in `AnnotatorFileInfo` is now derived
+  from `DocscribeSettings.hideCommentsByDefault` instead of being hardcoded to `0`. Changing
+  settings automatically invalidates cached annotations. Cache also has a max size (1000 entries)
+  with LRU-like eviction.
+- **Version** bumped from `0.1.4` to `0.1.5`.
+
+### Fixed
+
+- **Annotation cache never invalidated on settings change** — `DocscribeSettingsChangeListener`
+  now calls `DocscribeAnnotatorCache.clear()` when settings are saved, in addition to refreshing
+  code folding.
+
+### Build
+
+- **`intellijDependencies()`** — added to repository section in `build.gradle.kts` (required by
+  `instrumentTestCode` task).
+- **Total test count** — 119 tests across 18 test files, all passing.
+
 ## [0.1.4] — 2026-06-29
 
 ### Fixed

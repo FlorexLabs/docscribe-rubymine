@@ -25,6 +25,20 @@ class SafeFixActionTest : BasePlatformTestCase() {
         assertTrue(presentation.isEnabledAndVisible)
     }
 
+    fun testSafeFixActionIsEnabledForRakefile() {
+        val file = myFixture.configureByText("Rakefile", "task :test do\nend").virtualFile
+        val dataContext =
+            SimpleDataContext
+                .builder()
+                .add(CommonDataKeys.VIRTUAL_FILE, file)
+                .add(CommonDataKeys.PROJECT, myFixture.project)
+                .build()
+        val presentation = Presentation()
+        val event = AnActionEvent.createEvent(dataContext, presentation, "test", ActionUiKind.NONE, null)
+        action.update(event)
+        assertTrue(presentation.isEnabledAndVisible)
+    }
+
     fun testSafeFixActionIsDisabledForNonRubyFile() {
         val file = myFixture.configureByText("foo.txt", "plain text").virtualFile
         val dataContext =

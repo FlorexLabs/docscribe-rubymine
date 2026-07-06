@@ -25,6 +25,20 @@ class AggressiveFixActionTest : BasePlatformTestCase() {
         assertTrue(presentation.isEnabledAndVisible)
     }
 
+    fun testAggressiveFixActionIsEnabledForRakefile() {
+        val file = myFixture.configureByText("Rakefile", "task :test do\nend").virtualFile
+        val dataContext =
+            SimpleDataContext
+                .builder()
+                .add(CommonDataKeys.VIRTUAL_FILE, file)
+                .add(CommonDataKeys.PROJECT, myFixture.project)
+                .build()
+        val presentation = Presentation()
+        val event = AnActionEvent.createEvent(dataContext, presentation, "test", ActionUiKind.NONE, null)
+        action.update(event)
+        assertTrue(presentation.isEnabledAndVisible)
+    }
+
     fun testAggressiveFixActionIsDisabledForNonRubyFile() {
         val file = myFixture.configureByText("foo.txt", "plain text").virtualFile
         val dataContext =
