@@ -1,6 +1,6 @@
 # Changelog
 
-## [0.1.5] — 2026-07-05
+## [0.1.5] — 2026-07-06
 
 ### Added
 
@@ -55,6 +55,7 @@
 
 - **`intellijDependencies()`** — added to repository section in `build.gradle.kts` (required by
   `instrumentTestCode` task).
+- **Total test count** — 119 tests across 18 test files, all passing.
 
 ## [0.1.4] — 2026-06-29
 
