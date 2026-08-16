@@ -26,6 +26,7 @@ enum class DocscribeStrategy {
  * @property strategy    Which fix strategy to apply; defaults to [DocscribeStrategy.CHECK].
  * @property formatJson  Whether to pass `--format json` (only meaningful for [DocscribeStrategy.CHECK]).
  * @property subcommand  Optional subcommand like `"update_types"` — takes priority over [strategy].
+ * @property bundlePath  Absolute path to the SDK `bundle` executable, or `null` to rely on `PATH`.
  */
 data class RunOptions(
     val projectDir: String,
@@ -33,6 +34,7 @@ data class RunOptions(
     val strategy: DocscribeStrategy = DocscribeStrategy.CHECK,
     val formatJson: Boolean = true,
     val subcommand: String? = null,
+    val bundlePath: String? = null,
 )
 
 /**
@@ -216,6 +218,6 @@ object DocscribeRunner {
             } else {
                 getCommandArgs(options.strategy, options.formatJson, options.file)
             }
-        return executor.execute("bundle", listOf("exec", "docscribe") + args, projectRoot)
+        return executor.execute(options.bundlePath ?: "bundle", listOf("exec", "docscribe") + args, projectRoot)
     }
 }

@@ -115,4 +115,20 @@ class DocscribeRunnerTest {
         )
         assertEquals(listOf("exec", "docscribe", "--format", "json"), executor.lastArgs)
     }
+
+    @Test
+    fun `runDocscribe with bundlePath executes the SDK bundle path`() {
+        val executor = RecordingExecutor()
+        DocscribeRunner.runDocscribe(
+            RunOptions(
+                projectDir = "/project",
+                file = "test.rb",
+                strategy = DocscribeStrategy.SAFE,
+                bundlePath = "/sdk/bin/bundle",
+            ),
+            executor,
+        )
+        assertEquals("/sdk/bin/bundle", executor.lastCommand)
+        assertEquals(listOf("exec", "docscribe", "-a", "-B", "test.rb"), executor.lastArgs)
+    }
 }
