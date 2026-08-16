@@ -7,6 +7,8 @@ import com.intellij.openapi.actionSystem.CommonDataKeys
 import com.intellij.openapi.actionSystem.Presentation
 import com.intellij.openapi.actionSystem.impl.SimpleDataContext
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
+import java.io.File
+import kotlin.io.path.createTempDirectory
 
 class CheckWorkspaceActionTest : BasePlatformTestCase() {
     private val action = CheckWorkspaceAction()
@@ -36,5 +38,41 @@ class CheckWorkspaceActionTest : BasePlatformTestCase() {
 
     fun testCheckWorkspaceActionUpdateThreadIsBGT() {
         assertEquals(ActionUpdateThread.BGT, action.actionUpdateThread)
+    }
+
+    // ── Ruby file detection ─────────────────────────────────────────
+
+    fun testIsRubyFileAcceptsRb() {
+        assertTrue(CheckWorkspaceAction.isRubyFile("models/user.rb"))
+    }
+
+    fun testIsRubyFileAcceptsRake() {
+        assertTrue(CheckWorkspaceAction.isRubyFile("tasks/build.rake"))
+    }
+
+    fun testIsRubyFileAcceptsRakefileWithoutExtension() {
+        assertTrue(CheckWorkspaceAction.isRubyFile("Rakefile"))
+    }
+
+    fun testIsRubyFileRejectsNonRubyFiles() {
+        assertFalse(CheckWorkspaceAction.isRubyFile("user.txt"))
+        assertFalse(CheckWorkspaceAction.isRubyFile("Rakefile.txt"))
+        assertFalse(CheckWorkspaceAction.isRubyFile("Gemfile"))
+    }
+
+    // ── file collection ─────────────────────────────────────────────
+
+    fun testCollectRubyFilesFiltersFilesOutsideContentRoots() {
+        // A real directory is not part of the project content roots, so nothing is collected.
+        val dir = createTempDirectory().toFile()
+        val rubyFile = File(dir, "app.rb")
+        rubyFile.writeText("class Foo; end")
+        File(dir, "plain.txt").writeText("plain")
+        File(dir, "Rakefile").writeText("task :test do\nend")
+
+        val files = CheckWorkspaceAction.collectRubyFiles(project, dir.absolutePath)
+
+        assertTrue(files.isEmpty())
+        assertTrue(rubyFile.exists())
     }
 }

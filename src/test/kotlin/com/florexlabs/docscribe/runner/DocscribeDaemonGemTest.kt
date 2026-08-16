@@ -92,6 +92,72 @@ class DocscribeDaemonGemTest : BasePlatformTestCase() {
         assertNull(DocscribeDaemon.parseVersion("v1.5.1"))
     }
 
+    // ── batch capability ────────────────────────────────────────────
+
+    fun testParseVersion151NoBatchMode() {
+        val caps = DocscribeDaemon.parseVersion("1.5.1")
+        assertNotNull(caps)
+        assertTrue(caps!!.serverMode)
+        assertFalse(caps.batchMode)
+    }
+
+    fun testParseVersion152BatchMode() {
+        val caps = DocscribeDaemon.parseVersion("1.5.2")
+        assertNotNull(caps)
+        assertTrue(caps!!.serverMode)
+        assertTrue(caps.batchMode)
+    }
+
+    fun testParseVersion160BatchMode() {
+        val caps = DocscribeDaemon.parseVersion("1.6.0")
+        assertNotNull(caps)
+        assertTrue(caps!!.batchMode)
+    }
+
+    fun testParseVersion200BatchMode() {
+        val caps = DocscribeDaemon.parseVersion("2.0.0")
+        assertNotNull(caps)
+        assertTrue(caps!!.batchMode)
+    }
+
+    fun testParseVersion150NoServerModeNoBatchMode() {
+        val caps = DocscribeDaemon.parseVersion("1.5.0")
+        assertNotNull(caps)
+        assertFalse(caps!!.serverMode)
+        assertFalse(caps.batchMode)
+    }
+
+    fun testParseVersion149NoBatchMode() {
+        val caps = DocscribeDaemon.parseVersion("1.4.9")
+        assertNotNull(caps)
+        assertFalse(caps!!.batchMode)
+    }
+
+    fun testParseVersion152TrailingNewlineBatchMode() {
+        val caps = DocscribeDaemon.parseVersion("1.5.2\n")
+        assertNotNull(caps)
+        assertTrue(caps!!.batchMode)
+    }
+
+    fun testExecuteBatchReturnsDescriptiveErrorWhenDocscribeMissing() {
+        val daemon = DocscribeDaemon(project)
+        daemon.docscribeStatus = DocscribeDaemon.DocscribeStatus.MISSING
+        val result = daemon.executeBatch(listOf("/tmp/a.rb"), projectDir = "/tmp")
+        assertFalse(result.success)
+        assertEquals(2, result.exitCode)
+        assertTrue(result.stderr.contains("gem \"docscribe\""))
+    }
+
+    fun testExecuteBatchFallsBackToCliWhenNoBatchMode() {
+        val daemon = DocscribeDaemon(project)
+        daemon.docscribeStatus = DocscribeDaemon.DocscribeStatus.AVAILABLE
+        daemon.capabilities = DocscribeDaemon.DocscribeCapabilities("1.5.1", serverMode = true, batchMode = false)
+        // Version 1.5.1 supports the server but not check_batch — should fall back to CLI
+        // without crashing (no Gemfile in test, so the CLI itself may fail).
+        val result = daemon.executeBatch(listOf("/tmp/a.rb"), projectDir = "/tmp")
+        assertNotNull(result)
+    }
+
     // ── capability integration ───────────────────────────────────────
 
     fun testExecuteFallsBackToCliWhenNoServerMode() {

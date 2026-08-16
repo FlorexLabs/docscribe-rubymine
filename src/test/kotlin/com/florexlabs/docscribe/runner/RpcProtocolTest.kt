@@ -109,4 +109,25 @@ class RpcProtocolTest {
         val params = parsed["params"] as Map<*, *>
         assertEquals("/path/to/file.rb", params["file"])
     }
+
+    @Test
+    fun `check_batch request includes files list`() {
+        val params = DocscribeDaemon.buildBatchParams(listOf("/proj/a.rb", "/proj/b.rb"), "/proj")
+        val json = DocscribeDaemon.buildRpcRequestJson("check_batch", params)
+        val parsed = DocscribeDaemon.parseRpcResponse(json.trimEnd())
+        assertNotNull(parsed)
+        assertEquals("check_batch", parsed!!["method"])
+        val requestParams = parsed["params"] as Map<*, *>
+        assertEquals(listOf("/proj/a.rb", "/proj/b.rb"), requestParams["files"])
+        assertEquals("/proj", requestParams["project_dir"])
+    }
+
+    @Test
+    fun `check_batch request includes per-file timeout`() {
+        val params = DocscribeDaemon.buildBatchParams(listOf("a.rb"), "/proj", timeoutSeconds = 42)
+        val json = DocscribeDaemon.buildRpcRequestJson("check_batch", params)
+        val parsed = DocscribeDaemon.parseRpcResponse(json.trimEnd())
+        val requestParams = parsed!!["params"] as Map<*, *>
+        assertEquals(42, (requestParams["timeout"] as? Number)?.toInt())
+    }
 }
