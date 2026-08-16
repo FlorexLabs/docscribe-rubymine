@@ -1,7 +1,5 @@
 package com.florexlabs.docscribe.actions
 
-import com.florexlabs.docscribe.actions.CheckWorkspaceAction.Companion.WorkspaceCheckFailedException
-import com.florexlabs.docscribe.actions.CheckWorkspaceAction.Companion.runChunkedCheck
 import com.florexlabs.docscribe.runner.DocscribeDaemon
 import com.florexlabs.docscribe.runner.RunResult
 import com.intellij.openapi.progress.ProcessCanceledException

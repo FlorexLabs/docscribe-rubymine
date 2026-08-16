@@ -43,21 +43,21 @@ class CheckWorkspaceActionTest : BasePlatformTestCase() {
     // ── Ruby file detection ─────────────────────────────────────────
 
     fun testIsRubyFileAcceptsRb() {
-        assertTrue(CheckWorkspaceAction.isRubyFile("models/user.rb"))
+        assertTrue(isRubyFile("models/user.rb"))
     }
 
     fun testIsRubyFileAcceptsRake() {
-        assertTrue(CheckWorkspaceAction.isRubyFile("tasks/build.rake"))
+        assertTrue(isRubyFile("tasks/build.rake"))
     }
 
     fun testIsRubyFileAcceptsRakefileWithoutExtension() {
-        assertTrue(CheckWorkspaceAction.isRubyFile("Rakefile"))
+        assertTrue(isRubyFile("Rakefile"))
     }
 
     fun testIsRubyFileRejectsNonRubyFiles() {
-        assertFalse(CheckWorkspaceAction.isRubyFile("user.txt"))
-        assertFalse(CheckWorkspaceAction.isRubyFile("Rakefile.txt"))
-        assertFalse(CheckWorkspaceAction.isRubyFile("Gemfile"))
+        assertFalse(isRubyFile("user.txt"))
+        assertFalse(isRubyFile("Rakefile.txt"))
+        assertFalse(isRubyFile("Gemfile"))
     }
 
     // ── file collection ─────────────────────────────────────────────
@@ -70,7 +70,7 @@ class CheckWorkspaceActionTest : BasePlatformTestCase() {
         File(dir, "plain.txt").writeText("plain")
         File(dir, "Rakefile").writeText("task :test do\nend")
 
-        val files = CheckWorkspaceAction.collectRubyFiles(project, dir.absolutePath)
+        val files = collectRubyFiles(project, dir.absolutePath)
 
         assertTrue(files.isEmpty())
         assertTrue(rubyFile.exists())
