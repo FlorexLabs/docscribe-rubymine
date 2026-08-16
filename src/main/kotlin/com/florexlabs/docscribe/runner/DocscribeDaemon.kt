@@ -1,6 +1,7 @@
 package com.florexlabs.docscribe.runner
 
 import com.google.gson.GsonBuilder
+import com.intellij.notification.NotificationGroup
 import com.intellij.notification.NotificationGroupManager
 import com.intellij.notification.NotificationType
 import com.intellij.openapi.Disposable
@@ -501,8 +502,16 @@ class DocscribeDaemon(
      * @param message The notification message text.
      */
     private fun showNotification(message: String) {
-        val group = NotificationGroupManager.getInstance().getNotificationGroup("DocScribe")
+        val group = notificationGroup() ?: return
         group.createNotification(message, NotificationType.ERROR).notify(project)
+    }
+
+    private fun notificationGroup(): NotificationGroup? {
+        val group = NotificationGroupManager.getInstance().getNotificationGroup("DocScribe")
+        if (group == null) {
+            log.warn("Notification group 'DocScribe' is not registered")
+        }
+        return group
     }
 
     /**
@@ -563,13 +572,16 @@ class DocscribeDaemon(
      */
     private fun showMissingDocscribeNotification(gemRoot: String) {
         missingNotified = true
+        val group = notificationGroup()
+        if (group == null) {
+            log.warn("Cannot show missing-docscribe notification: group not registered")
+            return
+        }
         val message =
             "docscribe gem not found in project Gemfile. " +
                 "Add 'gem \"docscribe\"' and run 'bundle install'."
         val notification =
-            NotificationGroupManager
-                .getInstance()
-                .getNotificationGroup("DocScribe")
+            group
                 .createNotification(message, NotificationType.ERROR)
         notification.addAction(
             object : AnAction("Open Gemfile") {

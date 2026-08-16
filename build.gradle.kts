@@ -43,10 +43,11 @@ intellijPlatform {
 
         changeNotes =
             """
-            <p>DocScribe 0.1.6: batched workspace checking.</p>
+            <p>DocScribe 0.1.6: batched workspace checking, RubyMine 2026.1 – 2026.2 support.</p>
             <ul>
                 <li>Workspace check now sends all Ruby files to the daemon in a single batch RPC call</li>
                 <li>Requires docscribe gem &gt;= 1.5.2 for batch mode (falls back to CLI otherwise)</li>
+                <li>Supports RubyMine 2026.1 and 2026.2</li>
                 <li>Auto-generate YARD documentation for Ruby methods</li>
                 <li>Check file / workspace diagnostics</li>
                 <li>Safe and aggressive fix actions</li>
@@ -58,6 +59,14 @@ intellijPlatform {
         certificateChain = providers.environmentVariable("CERTIFICATE_CHAIN")
         privateKey = providers.environmentVariable("PRIVATE_KEY")
         password = providers.environmentVariable("PRIVATE_KEY_PASSWORD")
+    }
+
+    pluginVerification {
+        ides {
+            create("RM", "2026.1") {} // oldest supported line
+            create("RM", "2026.2") {} // 2026.2 GA
+            create("RM", "2026.2.1") {} // latest 2026.2 patch
+        }
     }
 
     publishing {

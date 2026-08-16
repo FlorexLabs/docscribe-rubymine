@@ -19,6 +19,12 @@
 ### Changed
 
 - **Version** bumped from `0.1.5` to `0.1.6`.
+- **Target IDE support widened to 2026.1 – 2026.2** — plugin now installs on RubyMine
+  2026.1 (build `261.*`) and 2026.2 (build `262.*`), and `verifyPlugin` runs against both
+  release lines (2026.1.5, 2026.2, 2026.2.1) in CI.
+- **Notification group registration hardened** — dropped the i18n `key` attribute and added a
+  registry fallback, so DocScribe notifications still work when the group is not resolvable
+  (2026.2 platform change).
 
 ### Fixed
 
