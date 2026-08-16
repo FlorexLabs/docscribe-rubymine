@@ -43,8 +43,10 @@ intellijPlatform {
 
         changeNotes =
             """
-            <p>Initial release of DocScribe for RubyMine.</p>
+            <p>DocScribe 0.1.6: batched workspace checking.</p>
             <ul>
+                <li>Workspace check now sends all Ruby files to the daemon in a single batch RPC call</li>
+                <li>Requires docscribe gem &gt;= 1.5.2 for batch mode (falls back to CLI otherwise)</li>
                 <li>Auto-generate YARD documentation for Ruby methods</li>
                 <li>Check file / workspace diagnostics</li>
                 <li>Safe and aggressive fix actions</li>

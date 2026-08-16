@@ -3,8 +3,6 @@ package com.florexlabs.docscribe.actions
 import com.florexlabs.docscribe.runner.DocscribeDaemon
 import com.florexlabs.docscribe.runner.DocscribeOutputParser
 import com.florexlabs.docscribe.runner.DocscribeRunner
-import com.florexlabs.docscribe.runner.DocscribeStrategy
-import com.florexlabs.docscribe.runner.RunOptions
 import com.intellij.notification.NotificationGroupManager
 import com.intellij.notification.NotificationType
 import com.intellij.openapi.actionSystem.ActionUpdateThread
@@ -13,16 +11,23 @@ import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.progress.ProgressIndicator
 import com.intellij.openapi.progress.Task
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.roots.ProjectFileIndex
+import com.intellij.openapi.vfs.LocalFileSystem
+import com.intellij.openapi.vfs.VfsUtilCore
+import java.io.File
 
 /**
  * Run docscribe **check** on all Ruby files in the project workspace.
  *
- * Runs in background via [Task.Backgroundable]. Shows a summary notification when done.
+ * Enumerates `.rb` / `.rake` / `Rakefile` files in the project content roots and sends them
+ * to the daemon in a single `check_batch` RPC call (falling back to the CLI directory scan
+ * when the daemon or batch support is unavailable). Runs in background via
+ * [Task.Backgroundable] and shows a summary notification when done.
  */
 class CheckWorkspaceAction : AnAction() {
     /**
-     * Find the project root and run `docscribe --format json` across the entire workspace
-     * in a background task. Parse the JSON output and show a summary notification.
+     * Enumerate the Ruby files, run `docscribe --format json` across the whole workspace
+     * in a background task, and show a summary notification.
      */
     override fun actionPerformed(e: AnActionEvent) {
         val project = e.project ?: return
@@ -37,15 +42,15 @@ class CheckWorkspaceAction : AnAction() {
             var totalIssues = 0
             var totalErrors = 0
             var fileCount = 0
+            var foundRubyFiles = true
 
             override fun run(indicator: ProgressIndicator) {
-                val options =
-                    RunOptions(
-                        projectDir = projectRoot,
-                        strategy = DocscribeStrategy.CHECK,
-                        formatJson = true,
-                    )
-                val result = DocscribeDaemon.executeWithFallback(project, options)
+                val files = collectRubyFiles(project, projectRoot)
+                if (files.isEmpty()) {
+                    foundRubyFiles = false
+                    return
+                }
+                val result = DocscribeDaemon.executeBatchWithFallback(project, files, projectRoot)
                 if (result.exitCode >= 2) {
                     notify(project, "DocScribe: error running docscribe", NotificationType.ERROR)
                     return
@@ -59,6 +64,10 @@ class CheckWorkspaceAction : AnAction() {
             }
 
             override fun onSuccess() {
+                if (!foundRubyFiles) {
+                    notify(project, "DocScribe: no Ruby files found in workspace", NotificationType.INFORMATION)
+                    return
+                }
                 val msg = "DocScribe: checked $fileCount file(s)"
                 val details = mutableListOf<String>()
                 if (totalIssues > 0) details.add("$totalIssues issue(s) found")
@@ -97,5 +106,47 @@ class CheckWorkspaceAction : AnAction() {
     ) {
         val group = NotificationGroupManager.getInstance().getNotificationGroup("DocScribe")
         group.createNotification(content, type).notify(project)
+    }
+
+    companion object {
+        /**
+         * Collect absolute paths of all Ruby files in the project content roots.
+         *
+         * Only files under the project root directory are considered. Excluded files
+         * (e.g. `.git`, `node_modules`, IDE exclusion patterns) are skipped, as are files
+         * outside the project content roots.
+         *
+         * @param project    The current project.
+         * @param projectRoot The project root directory (Gemfile location).
+         * @return Absolute paths of the `.rb` / `.rake` / `Rakefile` files, in traversal order.
+         */
+        @JvmStatic
+        fun collectRubyFiles(
+            project: Project,
+            projectRoot: String,
+        ): List<String> {
+            val fileIndex = ProjectFileIndex.getInstance(project)
+            val rootDir = LocalFileSystem.getInstance().findFileByIoFile(File(projectRoot)) ?: return emptyList()
+            val collected = mutableListOf<String>()
+            VfsUtilCore.iterateChildrenRecursively(
+                rootDir,
+                { f -> !fileIndex.isExcluded(f) },
+            ) { f ->
+                if (!f.isDirectory && isRubyFile(f.name) && fileIndex.isInContent(f)) {
+                    collected.add(f.path)
+                }
+                true
+            }
+            return collected
+        }
+
+        /**
+         * Whether a file name is a Ruby file handled by docscribe.
+         *
+         * @param name The file name (with extension).
+         * @return `true` for `.rb`, `.rake`, and `Rakefile`.
+         */
+        @JvmStatic
+        fun isRubyFile(name: String): Boolean = name.endsWith(".rb") || name.endsWith(".rake") || name == "Rakefile"
     }
 }

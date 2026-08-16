@@ -40,6 +40,7 @@ import kotlin.concurrent.Volatile
  *
  * ## RPC methods
  * - `check` — dry-run diagnostics.
+ * - `check_batch` — dry-run diagnostics for multiple files in one call.
  * - `fix` — with `"strategy": "safe"` or `"aggressive"`.
  * - `ping` — health check.
  * - `update_types` — refresh YARD docs from RBS signatures.
@@ -93,10 +94,12 @@ class DocscribeDaemon(
      *
      * @property version      Full version string (e.g. `"1.5.1"`).
      * @property serverMode   Server/daemon mode supported (version >= 1.5.1).
+     * @property batchMode    `check_batch` RPC supported (version >= 1.5.2).
      */
     data class DocscribeCapabilities(
         val version: String,
         val serverMode: Boolean,
+        val batchMode: Boolean = false,
     )
 
     /**
@@ -163,6 +166,83 @@ class DocscribeDaemon(
             val response = performRpcCall(handle, command, params)
             return processRpcResponse(response, command, file, projectDir, formatJson)
         }
+    }
+
+    /**
+     * Execute a `check_batch` RPC against the server, falling back to CLI if needed.
+     *
+     * Sends all [files] in a single RPC call. When the daemon is unavailable or the installed
+     * docscribe version does not support `check_batch` (< 1.5.2), falls back to the directory-scan
+     * CLI mode (same as the pre-batch workspace check).
+     *
+     * @param files      Absolute paths of the Ruby files to check.
+     * @param projectDir Optional project root directory.
+     * @return The [RunResult] containing an aggregated check JSON (see [buildBatchCheckJson]).
+     */
+    fun executeBatch(
+        files: List<String>,
+        projectDir: String? = null,
+    ): RunResult {
+        synchronized(lock) {
+            val handle = ensureRunning(projectDir)
+            if (handle == null || capabilities?.batchMode != true) {
+                log.info("check_batch not available, using CLI directory scan")
+                return fallback("check", file = null, projectDir = projectDir, formatJson = true)
+            }
+            val params = buildBatchParams(files, projectDir ?: project.basePath ?: "")
+            val response = rpcCall(handle, "check_batch", params)
+            return processBatchResponse(response, projectDir)
+        }
+    }
+
+    /**
+     * Convert the raw `check_batch` RPC response into an aggregated [RunResult].
+     *
+     * Per-file results are merged into a single check JSON via [buildBatchCheckJson]:
+     * files with `status` `"ok"`/`"fail"` become file entries with their offenses,
+     * files with status `"error"` are counted in the summary `error_count`.
+     *
+     * @param response  The parsed RPC response, or `null`.
+     * @param projectDir The project root directory.
+     * @return A [RunResult] representing the aggregated batch outcome.
+     */
+    private fun processBatchResponse(
+        response: Map<String, Any?>?,
+        projectDir: String?,
+    ): RunResult {
+        if (response == null) {
+            log.warn("Batch RPC returned null, falling back")
+            return fallback("check", file = null, projectDir = projectDir, formatJson = true)
+        }
+
+        val error = response["error"]
+        if (error != null) {
+            val msg = (error as? Map<*, *>)?.get("message")?.toString() ?: error.toString()
+            return RunResult(success = false, hasIssues = false, exitCode = 1, stdout = "", stderr = "Server error: $msg")
+        }
+
+        val result = response["result"] as? Map<*, *>
+        val results = result?.get("results") as? List<*> ?: emptyList<Any>()
+        val jsonOutput = buildBatchCheckJson(results)
+        val parsed = gson.fromJson(jsonOutput, Map::class.java)
+
+        @Suppress("UNCHECKED_CAST")
+        val parsedMap = parsed as? Map<String, Any?>
+
+        @Suppress("UNCHECKED_CAST")
+        val files = parsedMap?.get("files") as? List<Map<String, Any?>>
+        val totalOffenses = files?.sumOf { f -> (f["offenses"] as? List<*>)?.size ?: 0 } ?: 0
+
+        @Suppress("UNCHECKED_CAST")
+        val summary = parsedMap?.get("summary") as? Map<String, Any?>
+        val totalErrors = (summary?.get("error_count") as? Number)?.toInt() ?: 0
+        return RunResult(
+            success = true,
+            hasIssues = totalOffenses > 0,
+            exitCode = if (totalOffenses > 0 || totalErrors > 0) 1 else 0,
+            stdout = jsonOutput,
+            stderr = "",
+        )
     }
 
     /**
@@ -694,7 +774,31 @@ class DocscribeDaemon(
         private const val RPC_BUFFER_SIZE = 65536
         private const val RUBY_PATH_LOOKUP_TIMEOUT_SECONDS = 3L
         private const val GEM_CHECK_TIMEOUT_SECONDS = 10L
+        private const val BATCH_PER_FILE_TIMEOUT_SECONDS = 120L
+        private const val SERVER_MODE_MIN_VERSION = "1.5.1"
+        private const val BATCH_MODE_MIN_VERSION = "1.5.2"
         private val sharedGson by lazy { GsonBuilder().create() }
+
+        /**
+         * Build the parameters map sent in a `check_batch` RPC request.
+         *
+         * @param files          Absolute paths of the files to check.
+         * @param projectDir     Project root directory.
+         * @param timeoutSeconds Per-file timeout in seconds.
+         * @return A map of RPC parameters.
+         */
+        @JvmStatic
+        fun buildBatchParams(
+            files: List<String>,
+            projectDir: String,
+            timeoutSeconds: Long = BATCH_PER_FILE_TIMEOUT_SECONDS,
+        ): Map<String, Any?> =
+            mutableMapOf<String, Any?>(
+                "files" to files,
+                "project_dir" to projectDir,
+                "no_boilerplate" to true,
+                "timeout" to timeoutSeconds,
+            )
 
         /**
          * Build a JSON-RPC 2.0 request string.
@@ -756,28 +860,7 @@ class DocscribeDaemon(
             changes: List<*>,
         ): String {
             val gsonLocal = GsonBuilder().create()
-            val offenses =
-                changes.mapNotNull { change ->
-                    if (change is Map<*, *>) {
-                        val line = (change["line"] as? Number)?.toInt() ?: 1
-                        mapOf(
-                            "severity" to "convention",
-                            "cop_name" to "DocScribe/MissingDocumentation",
-                            "message" to "Missing YARD documentation",
-                            "corrected" to false,
-                            "correctable" to true,
-                            "location" to
-                                mapOf(
-                                    "start_line" to line,
-                                    "start_column" to 1,
-                                    "last_line" to line,
-                                    "last_column" to 1,
-                                ),
-                        )
-                    } else {
-                        null
-                    }
-                }
+            val offenses = changesToOffenses(changes)
             val output =
                 mapOf(
                     "metadata" to mapOf("docscribe_version" to "1.5.1"),
@@ -798,6 +881,99 @@ class DocscribeDaemon(
                 )
             return gsonLocal.toJson(output)
         }
+
+        /**
+         * Build an aggregated check JSON from a `check_batch` server response.
+         *
+         * Each batch result must be a map with:
+         * - `"file"` — the absolute file path;
+         * - `"status"` — `"ok"`, `"fail"`, or `"error"`;
+         * - `"changes"` — list of changes (ignored for `"error"` status);
+         * - `"error"` — error message (only for `"error"` status, unused in output).
+         *
+         * Files with status `"ok"`/`"fail"` become file entries with their offenses;
+         * files with status `"error"` are counted in the summary `error_count`.
+         * Non-map entries are skipped.
+         *
+         * @param results The `results` array from the `check_batch` response.
+         * @return A JSON string compatible with [DocscribeOutputParser.parseJson].
+         */
+        fun buildBatchCheckJson(results: List<*>): String {
+            val gsonLocal = GsonBuilder().create()
+            val files = mutableListOf<Map<String, Any>>()
+            var offenseCount = 0
+            var errorCount = 0
+            var targetCount = 0
+
+            val validResults =
+                results.mapNotNull { result ->
+                    if (result is Map<*, *>) {
+                        (result["file"] as? String)?.let { filePath -> filePath to result }
+                    } else {
+                        null
+                    }
+                }
+
+            for ((filePath, result) in validResults) {
+                targetCount++
+                val status = result["status"] as? String ?: "error"
+                if (status == "error") {
+                    errorCount++
+                    continue
+                }
+                val changes = result["changes"] as? List<*> ?: emptyList<Any>()
+                val offenses = changesToOffenses(changes)
+                offenseCount += offenses.size
+                files.add(mapOf("path" to filePath, "offenses" to offenses))
+            }
+
+            val output =
+                mapOf(
+                    "metadata" to mapOf("docscribe_version" to "1.5.1"),
+                    "files" to files,
+                    "summary" to
+                        mapOf(
+                            "offense_count" to offenseCount,
+                            "target_file_count" to targetCount,
+                            "inspected_file_count" to files.size,
+                            "error_count" to errorCount,
+                        ),
+                )
+            return gsonLocal.toJson(output)
+        }
+
+        /**
+         * Convert a list of server changes into offense maps.
+         *
+         * Each change is mapped to an offense with severity `convention`, cop name
+         * `DocScribe/MissingDocumentation`, and the change's line number (default 1).
+         * Non-map elements are skipped.
+         *
+         * @param changes The list of changes from the server response.
+         * @return A list of offense maps.
+         */
+        private fun changesToOffenses(changes: List<*>): List<Map<String, Any>> =
+            changes.mapNotNull { change ->
+                if (change is Map<*, *>) {
+                    val line = (change["line"] as? Number)?.toInt() ?: 1
+                    mapOf(
+                        "severity" to "convention",
+                        "cop_name" to "DocScribe/MissingDocumentation",
+                        "message" to "Missing YARD documentation",
+                        "corrected" to false,
+                        "correctable" to true,
+                        "location" to
+                            mapOf(
+                                "start_line" to line,
+                                "start_column" to 1,
+                                "last_line" to line,
+                                "last_column" to 1,
+                            ),
+                    )
+                } else {
+                    null
+                }
+            }
 
         /**
          * Get the [DocscribeDaemon] instance for the given project.
@@ -862,17 +1038,54 @@ class DocscribeDaemon(
          * Returns `null` for unparseable output (treated as unknown version, server mode disabled).
          *
          * @param versionOutput The trimmed stdout from `bundle exec docscribe --version`.
-         * @return [DocscribeCapabilities] with server mode enabled for version >= 1.5.1.
+         * @return [DocscribeCapabilities] with server mode enabled for version >= 1.5.1
+         *   and batch mode enabled for version >= 1.5.2.
          */
         @JvmStatic
         fun parseVersion(versionOutput: String): DocscribeCapabilities? {
             val version = versionOutput.trim().takeIf { it.matches(Regex("""\d+\.\d+\.\d+""")) } ?: return null
             val parts = version.split(".").map { it.toIntOrNull() ?: return null }
-            val serverMode =
-                parts.size == 3 && (
-                    parts[0] > 1 || (parts[0] == 1 && parts[1] > 5) || (parts[0] == 1 && parts[1] == 5 && parts[2] >= 1)
-                )
-            return DocscribeCapabilities(version = version, serverMode = serverMode)
+            val serverMode = parts.size == 3 && atLeast(parts, SERVER_MODE_MIN_VERSION)
+            val batchMode = parts.size == 3 && atLeast(parts, BATCH_MODE_MIN_VERSION)
+            return DocscribeCapabilities(version = version, serverMode = serverMode, batchMode = batchMode)
+        }
+
+        /**
+         * Compare a parsed version triple against a target version.
+         *
+         * @param parts         The parsed version parts `[major, minor, patch]`.
+         * @param targetVersion Target version string like `"1.5.1"`.
+         * @return `true` if the parsed version is greater than or equal to the target.
+         */
+        private fun atLeast(
+            parts: List<Int>,
+            targetVersion: String,
+        ): Boolean {
+            val target = targetVersion.split(".").map { it.toInt() }
+            return parts[0] > target[0] ||
+                (parts[0] == target[0] && parts[1] > target[1]) ||
+                (parts[0] == target[0] && parts[1] == target[1] && parts[2] >= target[2])
+        }
+
+        /**
+         * Execute a workspace-wide check via `check_batch`, falling back to CLI if the server
+         * or batch support is unavailable.
+         *
+         * Convenience wrapper that resolves the [DocscribeDaemon] instance and delegates to
+         * [executeBatch].
+         *
+         * @param project    The current project.
+         * @param files      Absolute paths of the Ruby files to check.
+         * @param projectDir The project root directory.
+         * @return The [RunResult] from the execution.
+         */
+        fun executeBatchWithFallback(
+            project: Project,
+            files: List<String>,
+            projectDir: String,
+        ): RunResult {
+            val daemon = getInstance(project)
+            return daemon.executeBatch(files, projectDir)
         }
     }
 }
