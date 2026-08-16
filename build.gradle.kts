@@ -46,6 +46,7 @@ intellijPlatform {
             <p>DocScribe 0.1.6: batched workspace checking, RubyMine 2026.1 – 2026.2 support.</p>
             <ul>
                 <li>Workspace check now sends all Ruby files to the daemon in a single batch RPC call</li>
+                <li>Workspace check shows progress and can be cancelled</li>
                 <li>Requires docscribe gem &gt;= 1.5.2 for batch mode (falls back to CLI otherwise)</li>
                 <li>Supports RubyMine 2026.1 and 2026.2</li>
                 <li>Auto-generate YARD documentation for Ruby methods</li>
