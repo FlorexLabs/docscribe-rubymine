@@ -10,13 +10,13 @@
     <dependencySupport kind="ruby" coordinate="docscribe" displayName="docscribe gem"/>
     <dependencySupport kind="ruby" coordinate="rbs" displayName="RBS"/>
 
-    <intentionAction language="ruby" bundle="messages.DocScribeBundle" categoryKey="docscribe.intentionCategory">
+    <intentionAction language="ruby" bundleName="messages.DocScribeBundle" categoryKey="docscribe.intentionCategory">
       <className>com.florexlabs.docscribe.annotator.DocscribeFixIntention</className>
     </intentionAction>
-    <intentionAction language="ruby" bundle="messages.DocScribeBundle" categoryKey="docscribe.intentionCategory">
+    <intentionAction language="ruby" bundleName="messages.DocScribeBundle" categoryKey="docscribe.intentionCategory">
       <className>com.florexlabs.docscribe.annotator.DocscribeAggressiveFixIntention</className>
     </intentionAction>
-    <intentionAction language="ruby" bundle="messages.DocScribeBundle" categoryKey="docscribe.intentionCategory">
+    <intentionAction language="ruby" bundleName="messages.DocScribeBundle" categoryKey="docscribe.intentionCategory">
       <className>com.florexlabs.docscribe.annotator.DocscribeCheckIntention</className>
     </intentionAction>
   </extensions>
