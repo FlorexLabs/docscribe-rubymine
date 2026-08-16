@@ -10,7 +10,10 @@ import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.fileEditor.FileEditorManager
+import com.intellij.openapi.module.ModuleManager
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.projectRoots.Sdk
+import com.intellij.openapi.roots.ModuleRootManager
 import com.intellij.openapi.roots.ProjectRootManager
 import com.intellij.openapi.vfs.LocalFileSystem
 import org.jetbrains.annotations.VisibleForTesting
@@ -533,7 +536,7 @@ class DocscribeDaemon(
 
         try {
             val pb =
-                ProcessBuilder("bundle", "exec", "docscribe", "--version")
+                ProcessBuilder(bundleCommand() ?: "bundle", "exec", "docscribe", "--version")
                     .directory(File(gemRoot))
             pb.environment().putAll(buildSdkEnvironment())
             pb.redirectErrorStream(true)
@@ -602,12 +605,13 @@ class DocscribeDaemon(
     /**
      * Resolve the Ruby executable path, preferring the project SDK if configured.
      *
-     * Falls back to `PATH` lookup, then to `~/.rbenv/shims/ruby`.
+     * Falls back to the first module SDK (Ruby projects often configure the SDK
+     * per-module only), then to `PATH` lookup and `~/.rbenv/shims/ruby`.
      *
      * @return Path to the Ruby executable, or `null` if none is found.
      */
     private fun rubyCommand(): String? {
-        val sdk = ProjectRootManager.getInstance(project).projectSdk
+        val sdk = resolveRubySdk()
         val homePath = sdk?.homePath
         if (homePath != null) {
             if (homePath.endsWith("ruby") && File(homePath).canExecute()) {
@@ -624,6 +628,46 @@ class DocscribeDaemon(
         log.warn("No Ruby found on PATH or via SDK")
         return null
     }
+
+    /**
+     * Resolve the project's Ruby SDK.
+     *
+     * Tries the project-level SDK first, then falls back to the SDK of any
+     * module, preferring one whose home path looks like a Ruby installation.
+     */
+    private fun resolveRubySdk(): Sdk? {
+        val projSdk = ProjectRootManager.getInstance(project).projectSdk
+        val moduleSdks =
+            ModuleManager
+                .getInstance(project)
+                .modules
+                .mapNotNull { ModuleRootManager.getInstance(it).sdk }
+        val chosenHome = resolveRubyHome(projSdk?.homePath, moduleSdks.map { it.homePath })
+        val chosen =
+            when {
+                chosenHome == null -> null
+                projSdk?.homePath == chosenHome -> projSdk
+                else -> moduleSdks.firstOrNull { it.homePath == chosenHome }
+            }
+        if (chosen != null) {
+            log.info(
+                "DocScribe: Ruby SDK from ${if (projSdk?.homePath == chosenHome) "project" else "module"}: " +
+                    "'${chosen.name}' home=${chosen.homePath}",
+            )
+        } else {
+            log.info("DocScribe: no project or module SDK found, falling back to PATH")
+        }
+        return chosen
+    }
+
+    /**
+     * Absolute path to the SDK's `bundle` executable, or `null` to rely on `PATH`.
+     *
+     * The JVM on macOS resolves bare executable names against its own copy of
+     * `PATH`, which the [buildSdkEnvironment] override does not reliably affect;
+     * using the absolute path guarantees the project's Ruby SDK is used.
+     */
+    private fun bundleCommand(): String? = bundlePathFor(rubyCommand())
 
     /**
      * Search for Ruby on `PATH` or in common version manager locations.
@@ -669,6 +713,7 @@ class DocscribeDaemon(
         if (gemRoot != null) {
             env["BUNDLE_GEMFILE"] = File(gemRoot, "Gemfile").absolutePath
         }
+        log.info("DocScribe: gem check env: ruby=$ruby, BUNDLE_GEMFILE=${env["BUNDLE_GEMFILE"]}, PATH=${env["PATH"]}")
         return env
     }
 
@@ -749,6 +794,7 @@ class DocscribeDaemon(
                 file = file,
                 strategy = strategy,
                 formatJson = formatJson,
+                bundlePath = bundleCommand(),
             )
         val sdkEnv = buildSdkEnvironment()
         val executor = if (sdkEnv.isEmpty()) DefaultCommandExecutor() else DefaultCommandExecutor(sdkEnv)
@@ -1098,6 +1144,43 @@ class DocscribeDaemon(
         ): RunResult {
             val daemon = getInstance(project)
             return daemon.executeBatch(files, projectDir)
+        }
+
+        /**
+         * Choose the Ruby home path to use for docscribe invocations.
+         *
+         * Priority: project-level SDK home, then the first module SDK home whose path
+         * looks like a Ruby installation (ends with `ruby`), then any module SDK home.
+         *
+         * @param projectHome The project-level SDK home path, or `null`.
+         * @param moduleHomes Home paths of all module-level SDKs, in module order.
+         * @return The chosen home path, or `null` when no SDK is configured.
+         */
+        @JvmStatic
+        fun resolveRubyHome(
+            projectHome: String?,
+            moduleHomes: List<String?>,
+        ): String? {
+            if (!projectHome.isNullOrBlank()) return projectHome
+            moduleHomes.firstOrNull { it?.endsWith("ruby") == true }?.let { return it }
+            return moduleHomes.firstOrNull { !it.isNullOrBlank() }
+        }
+
+        /**
+         * Absolute path to the `bundle` executable next to the given Ruby binary.
+         *
+         * The JVM on macOS resolves bare executable names against its own copy of
+         * `PATH`, which a `PATH` environment override does not reliably affect; the
+         * absolute path guarantees the project's Ruby SDK is used.
+         *
+         * @param rubyPath Path to the Ruby executable (SDK `homePath`), or `null`.
+         * @return Absolute path to `bundle` when it exists and is executable, else `null`.
+         */
+        @JvmStatic
+        fun bundlePathFor(rubyPath: String?): String? {
+            if (rubyPath.isNullOrBlank()) return null
+            val bundle = File(File(rubyPath).parentFile, "bundle")
+            return if (bundle.canExecute()) bundle.absolutePath else null
         }
     }
 }

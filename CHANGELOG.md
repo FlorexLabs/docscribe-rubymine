@@ -19,17 +19,15 @@
 ### Changed
 
 - **Version** bumped from `0.1.5` to `0.1.6`.
-- **Workspace check runs in chunks with progress** — files are sent to the daemon in batches
-  of 10 (`check_batch` per chunk), the progress view shows the current range
-  ("checking files 21–30 of 87…") and a progress bar. Fatal failures abort the run as before.
-- **Workspace check is cancellable** — the background task now supports cancellation between
-  chunks; cancelling stops further checks without waiting for the whole workspace.
-- **Target IDE support widened to 2026.1 – 2026.2** — plugin now installs on RubyMine
-  2026.1 (build `261.*`) and 2026.2 (build `262.*`), and `verifyPlugin` runs against both
-  release lines (2026.1.5, 2026.2, 2026.2.1) in CI.
-- **Notification group registration hardened** — dropped the i18n `key` attribute and added a
-  registry fallback, so DocScribe notifications still work when the group is not resolvable
-  (2026.2 platform change).
+- **Workspace check runs in chunks with progress** — files are sent to the daemon in batches of 10 (`check_batch` per
+  chunk), the progress view shows the current range ("checking files 21–30 of 87…") and a progress bar. Fatal failures
+  abort the run as before.
+- **Workspace check is cancellable** — the background task now supports cancellation between chunks; cancelling stops
+  further checks without waiting for the whole workspace.
+- **Target IDE support widened to 2026.1 – 2026.2** — plugin now installs on RubyMine 2026.1 (build `261.*`) and 2026.2
+  (build `262.*`), and `verifyPlugin` runs against both release lines (2026.1.5, 2026.2, 2026.2.1) in CI.
+- **Notification group registration hardened** — dropped the i18n `key` attribute and added a registry fallback, so
+  DocScribe notifications still work when the group is not resolvable (2026.2 platform change).
 
 ### Fixed
 
@@ -37,6 +35,11 @@
   `check` RPC with a `null` file, which the server rejected with "File not found"; the action then reported "checked 0
   file (s) — OK". The action now enumerates files itself and uses the batch endpoint, so daemon mode actually checks the
   whole workspace.
+- **Gem check uses system Ruby instead of the module Ruby SDK on macOS** — the JVM resolves bare
+  `bundle` executables against its own PATH copy, ignoring the environment override, so `/usr/bin/bundle` (system Ruby
+  2.6) ran even when the child process PATH pointed at the SDK `bin` dir and the gem check failed with
+  `rubygems.rb:302:in 'activate_bin_path'`. The daemon now resolves the SDK `bin` dir from the chosen Ruby home and runs
+  the SDK `bundle` by absolute path in every execution path (gem check and Safe/Aggressive Fix fallback).
 
 ## [0.1.5] — 2026-07-06
 
