@@ -1,6 +1,7 @@
+<!--suppress PluginXmlValidity -->
 <idea-plugin>
   <extensions defaultExtensionNs="com.intellij">
-    <externalAnnotator language="Ruby"
+    <externalAnnotator language="ruby"
                        implementationClass="com.florexlabs.docscribe.annotator.DocscribeAnnotator"/>
 
     <lang.foldingBuilder language="ruby" order="first"
