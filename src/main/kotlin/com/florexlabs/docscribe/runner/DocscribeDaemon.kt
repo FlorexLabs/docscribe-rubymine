@@ -638,7 +638,10 @@ class DocscribeDaemon(
     private fun resolveRubySdk(): Sdk? {
         val projSdk = ProjectRootManager.getInstance(project).projectSdk
         val moduleSdks =
-            ModuleManager.getInstance(project).modules.map { ModuleRootManager.getInstance(it).sdk }.filterNotNull()
+            ModuleManager
+                .getInstance(project)
+                .modules
+                .mapNotNull { ModuleRootManager.getInstance(it).sdk }
         val chosenHome = resolveRubyHome(projSdk?.homePath, moduleSdks.map { it.homePath })
         val chosen =
             when {
@@ -1142,37 +1145,42 @@ class DocscribeDaemon(
             val daemon = getInstance(project)
             return daemon.executeBatch(files, projectDir)
         }
+
+        /**
+         * Choose the Ruby home path to use for docscribe invocations.
+         *
+         * Priority: project-level SDK home, then the first module SDK home whose path
+         * looks like a Ruby installation (ends with `ruby`), then any module SDK home.
+         *
+         * @param projectHome The project-level SDK home path, or `null`.
+         * @param moduleHomes Home paths of all module-level SDKs, in module order.
+         * @return The chosen home path, or `null` when no SDK is configured.
+         */
+        @JvmStatic
+        fun resolveRubyHome(
+            projectHome: String?,
+            moduleHomes: List<String?>,
+        ): String? {
+            if (!projectHome.isNullOrBlank()) return projectHome
+            moduleHomes.firstOrNull { it?.endsWith("ruby") == true }?.let { return it }
+            return moduleHomes.firstOrNull { !it.isNullOrBlank() }
+        }
+
+        /**
+         * Absolute path to the `bundle` executable next to the given Ruby binary.
+         *
+         * The JVM on macOS resolves bare executable names against its own copy of
+         * `PATH`, which a `PATH` environment override does not reliably affect; the
+         * absolute path guarantees the project's Ruby SDK is used.
+         *
+         * @param rubyPath Path to the Ruby executable (SDK `homePath`), or `null`.
+         * @return Absolute path to `bundle` when it exists and is executable, else `null`.
+         */
+        @JvmStatic
+        fun bundlePathFor(rubyPath: String?): String? {
+            if (rubyPath.isNullOrBlank()) return null
+            val bundle = File(File(rubyPath).parentFile, "bundle")
+            return if (bundle.canExecute()) bundle.absolutePath else null
+        }
     }
-}
-
-/**
- * Choose the Ruby home path to use for docscribe invocations.
- *
- * Priority: project-level SDK home, then the first module SDK home whose path
- * looks like a Ruby installation (ends with `ruby`), then any module SDK home.
- *
- * @param projectHome The project-level SDK home path, or `null`.
- * @param moduleHomes Home paths of all module-level SDKs, in module order.
- * @return The chosen home path, or `null` when no SDK is configured.
- */
-fun resolveRubyHome(projectHome: String?, moduleHomes: List<String?>): String? {
-    if (!projectHome.isNullOrBlank()) return projectHome
-    moduleHomes.firstOrNull { it?.endsWith("ruby") == true }?.let { return it }
-    return moduleHomes.firstOrNull { !it.isNullOrBlank() }
-}
-
-/**
- * Absolute path to the `bundle` executable next to the given Ruby binary.
- *
- * The JVM on macOS resolves bare executable names against its own copy of
- * `PATH`, which a `PATH` environment override does not reliably affect; the
- * absolute path guarantees the project's Ruby SDK is used.
- *
- * @param rubyPath Path to the Ruby executable (SDK `homePath`), or `null`.
- * @return Absolute path to `bundle` when it exists and is executable, else `null`.
- */
-fun bundlePathFor(rubyPath: String?): String? {
-    if (rubyPath.isNullOrBlank()) return null
-    val bundle = File(File(rubyPath).parentFile, "bundle")
-    return if (bundle.canExecute()) bundle.absolutePath else null
 }
