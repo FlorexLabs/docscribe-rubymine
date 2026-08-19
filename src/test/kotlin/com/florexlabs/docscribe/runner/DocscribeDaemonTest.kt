@@ -111,27 +111,45 @@ class DocscribeDaemonTest {
 
     @Test
     fun `socket is alive while the file exists`() {
-        val dir = java.nio.file.Files.createTempDirectory("docscribe-sock-test")
+        val dir =
+            java.nio.file.Files
+                .createTempDirectory("docscribe-sock-test")
         val sock = dir.resolve("docscribe.sock")
-        assertTrue(java.nio.file.Files.createFile(sock).toFile().exists())
+        assertTrue(
+            java.nio.file.Files
+                .createFile(sock)
+                .toFile()
+                .exists(),
+        )
         try {
             assertTrue(isServerSocketAlive(sock))
         } finally {
-            java.nio.file.Files.deleteIfExists(sock)
-            java.nio.file.Files.deleteIfExists(dir)
+            java.nio.file.Files
+                .deleteIfExists(sock)
+            java.nio.file.Files
+                .deleteIfExists(dir)
         }
     }
 
     @Test
     fun `socket is dead after the file is removed`() {
-        val dir = java.nio.file.Files.createTempDirectory("docscribe-sock-test")
+        val dir =
+            java.nio.file.Files
+                .createTempDirectory("docscribe-sock-test")
         val sock = dir.resolve("docscribe.sock")
-        assertTrue(java.nio.file.Files.createFile(sock).toFile().exists())
-        java.nio.file.Files.delete(sock)
+        assertTrue(
+            java.nio.file.Files
+                .createFile(sock)
+                .toFile()
+                .exists(),
+        )
+        java.nio.file.Files
+            .delete(sock)
         try {
             assertFalse(isServerSocketAlive(sock))
         } finally {
-            java.nio.file.Files.deleteIfExists(dir)
+            java.nio.file.Files
+                .deleteIfExists(dir)
         }
     }
 

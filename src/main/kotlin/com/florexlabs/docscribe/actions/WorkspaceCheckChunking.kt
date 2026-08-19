@@ -99,19 +99,20 @@ internal fun collectRubyFiles(
     val fileIndex = ProjectFileIndex.getInstance(project)
     val rootDir = LocalFileSystem.getInstance().findFileByIoFile(File(projectRoot)) ?: return emptyList()
     val collected = mutableListOf<String>()
-    ReadAction.nonBlocking(
-        java.util.concurrent.Callable<Unit> {
-            VfsUtilCore.iterateChildrenRecursively(
-                rootDir,
-                { f -> !fileIndex.isExcluded(f) },
-            ) { f ->
-                if (!f.isDirectory && isRubyFile(f.name) && fileIndex.isInContent(f)) {
-                    collected.add(f.path)
+    ReadAction
+        .nonBlocking(
+            java.util.concurrent.Callable<Unit> {
+                VfsUtilCore.iterateChildrenRecursively(
+                    rootDir,
+                    { f -> !fileIndex.isExcluded(f) },
+                ) { f ->
+                    if (!f.isDirectory && isRubyFile(f.name) && fileIndex.isInContent(f)) {
+                        collected.add(f.path)
+                    }
+                    true
                 }
-                true
-            }
-        }
-    ).executeSynchronously()
+            },
+        ).executeSynchronously()
     return collected
 }
 

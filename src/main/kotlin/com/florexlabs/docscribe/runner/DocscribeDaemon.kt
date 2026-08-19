@@ -24,8 +24,8 @@ import java.net.UnixDomainSocketAddress
 import java.nio.ByteBuffer
 import java.nio.channels.SocketChannel
 import java.nio.charset.StandardCharsets
-import java.nio.file.Path
 import java.nio.file.Files
+import java.nio.file.Path
 import java.util.concurrent.TimeUnit
 import kotlin.concurrent.Volatile
 
@@ -1203,8 +1203,7 @@ class DocscribeDaemon(
  * @param socketPath The socket file to validate.
  * @return `true` if the socket file still exists.
  */
-internal fun isServerSocketAlive(socketPath: Path): Boolean =
-    Files.exists(socketPath)
+internal fun isServerSocketAlive(socketPath: Path): Boolean = Files.exists(socketPath)
 
 /**
  * Force a UTF-8 locale on the server environment.
