@@ -25,6 +25,7 @@ import java.nio.ByteBuffer
 import java.nio.channels.SocketChannel
 import java.nio.charset.StandardCharsets
 import java.nio.file.Path
+import java.nio.file.Files
 import java.util.concurrent.TimeUnit
 import kotlin.concurrent.Volatile
 
@@ -378,7 +379,11 @@ class DocscribeDaemon(
      */
     private fun ensureRunning(projectDir: String?): ServerHandle? {
         val existing = server
-        if (existing != null && alive) return existing
+        if (existing != null && alive) {
+            if (isServerSocketAlive(existing)) return existing
+            log.warn("Docscribe server socket is gone, restarting server")
+            die()
+        }
 
         // One-time check: is the docscribe gem available?
         if (docscribeStatus == DocscribeStatus.UNCHECKED) {
@@ -428,6 +433,18 @@ class DocscribeDaemon(
     }
 
     /**
+     * Check whether the previously started server socket still exists.
+     *
+     * The daemon exits after its idle timeout and removes the socket file, so
+     * `alive` alone is not sufficient — a stale handle must trigger a restart.
+     *
+     * @param handle The server handle to validate.
+     * @return `true` if the socket file still exists.
+     */
+    private fun isServerSocketAlive(handle: ServerHandle): Boolean =
+        Files.exists(handle.socketPath)
+
+    /**
      * Start the docscribe server as a child process.
      *
      * Uses `ruby -e` to load `docscribe/server` and call `Docscribe::Server.ensure_running!`.
@@ -451,6 +468,12 @@ class DocscribeDaemon(
         val pb = ProcessBuilder(ruby, "-e", script).directory(File(gemRoot))
         val env = pb.environment()
         env.putAll(buildSdkEnvironment())
+
+        // RubyMine may be launched without a locale set, which makes the server
+        // read source files as US-ASCII and fail on non-ASCII content.
+        val lang = System.getenv("LANG")?.takeIf { it.isNotBlank() } ?: "en_US.UTF-8"
+        env["LANG"] = lang
+        env["LC_ALL"] = lang
 
         val localGemPath = System.getProperty("docscribe.local.gem.path")
         if (localGemPath != null) {
