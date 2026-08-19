@@ -1,6 +1,7 @@
 package com.florexlabs.docscribe.runner
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -47,7 +48,8 @@ class DocscribeDaemonTest {
 
     @Test
     fun `parse response with deeply nested result`() {
-        val response = """{"jsonrpc":"2.0","result":{"changes":[{"line":1,"text":"# docs"},{"line":5,"text":"# more"}]}}"""
+        val response =
+            """{"jsonrpc":"2.0","result":{"changes":[{"line":1,"text":"# docs"},{"line":5,"text":"# more"}]}}"""
         val parsed = DocscribeDaemon.parseRpcResponse(response)
         val changes = (parsed!!["result"] as? Map<*, *>)?.get("changes") as? List<*>
         assertEquals(2, changes?.size)
@@ -103,5 +105,59 @@ class DocscribeDaemonTest {
         assertTrue(json.contains("\"target_file_count\":1"))
         assertTrue(json.contains("\"inspected_file_count\":1"))
         assertTrue(json.contains("\"error_count\":0"))
+    }
+
+    // --- server socket liveness (idle-timeout restart) ---
+
+    @Test
+    fun `socket is alive while the file exists`() {
+        val dir = java.nio.file.Files.createTempDirectory("docscribe-sock-test")
+        val sock = dir.resolve("docscribe.sock")
+        assertTrue(java.nio.file.Files.createFile(sock).toFile().exists())
+        try {
+            assertTrue(isServerSocketAlive(sock))
+        } finally {
+            java.nio.file.Files.deleteIfExists(sock)
+            java.nio.file.Files.deleteIfExists(dir)
+        }
+    }
+
+    @Test
+    fun `socket is dead after the file is removed`() {
+        val dir = java.nio.file.Files.createTempDirectory("docscribe-sock-test")
+        val sock = dir.resolve("docscribe.sock")
+        assertTrue(java.nio.file.Files.createFile(sock).toFile().exists())
+        java.nio.file.Files.delete(sock)
+        try {
+            assertFalse(isServerSocketAlive(sock))
+        } finally {
+            java.nio.file.Files.deleteIfExists(dir)
+        }
+    }
+
+    // --- locale configuration (non-ASCII sources under no-launch-locale) ---
+
+    @Test
+    fun `locale defaults to utf8 when LANG is unset`() {
+        val env = mutableMapOf<String, String>()
+        configureLocaleEnv(env, systemLang = null)
+        assertEquals("en_US.UTF-8", env["LANG"])
+        assertEquals("en_US.UTF-8", env["LC_ALL"])
+    }
+
+    @Test
+    fun `locale defaults to utf8 when LANG is blank`() {
+        val env = mutableMapOf<String, String>()
+        configureLocaleEnv(env, systemLang = "  ")
+        assertEquals("en_US.UTF-8", env["LANG"])
+        assertEquals("en_US.UTF-8", env["LC_ALL"])
+    }
+
+    @Test
+    fun `locale preserves the system LANG when set`() {
+        val env = mutableMapOf<String, String>()
+        configureLocaleEnv(env, systemLang = "ru_RU.UTF-8")
+        assertEquals("ru_RU.UTF-8", env["LANG"])
+        assertEquals("ru_RU.UTF-8", env["LC_ALL"])
     }
 }

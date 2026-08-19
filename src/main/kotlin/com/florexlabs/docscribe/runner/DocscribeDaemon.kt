@@ -380,7 +380,7 @@ class DocscribeDaemon(
     private fun ensureRunning(projectDir: String?): ServerHandle? {
         val existing = server
         if (existing != null && alive) {
-            if (isServerSocketAlive(existing)) return existing
+            if (isServerSocketAlive(existing.socketPath)) return existing
             log.warn("Docscribe server socket is gone, restarting server")
             die()
         }
@@ -433,18 +433,6 @@ class DocscribeDaemon(
     }
 
     /**
-     * Check whether the previously started server socket still exists.
-     *
-     * The daemon exits after its idle timeout and removes the socket file, so
-     * `alive` alone is not sufficient — a stale handle must trigger a restart.
-     *
-     * @param handle The server handle to validate.
-     * @return `true` if the socket file still exists.
-     */
-    private fun isServerSocketAlive(handle: ServerHandle): Boolean =
-        Files.exists(handle.socketPath)
-
-    /**
      * Start the docscribe server as a child process.
      *
      * Uses `ruby -e` to load `docscribe/server` and call `Docscribe::Server.ensure_running!`.
@@ -471,9 +459,7 @@ class DocscribeDaemon(
 
         // RubyMine may be launched without a locale set, which makes the server
         // read source files as US-ASCII and fail on non-ASCII content.
-        val lang = System.getenv("LANG")?.takeIf { it.isNotBlank() } ?: "en_US.UTF-8"
-        env["LANG"] = lang
-        env["LC_ALL"] = lang
+        configureLocaleEnv(env)
 
         val localGemPath = System.getProperty("docscribe.local.gem.path")
         if (localGemPath != null) {
@@ -1206,4 +1192,35 @@ class DocscribeDaemon(
             return if (bundle.canExecute()) bundle.absolutePath else null
         }
     }
+}
+
+/**
+ * Check whether a previously started server socket file still exists.
+ *
+ * The daemon exits after its idle timeout and removes the socket file, so
+ * `alive` alone is not sufficient — a stale handle must trigger a restart.
+ *
+ * @param socketPath The socket file to validate.
+ * @return `true` if the socket file still exists.
+ */
+internal fun isServerSocketAlive(socketPath: Path): Boolean =
+    Files.exists(socketPath)
+
+/**
+ * Force a UTF-8 locale on the server environment.
+ *
+ * RubyMine may be launched without a locale set, which makes Ruby read
+ * source files as US-ASCII and fail on non-ASCII content. Falls back to
+ * `en_US.UTF-8` when `LANG` is unset or blank.
+ *
+ * @param env        The environment map to configure (mutated in place).
+ * @param systemLang The `LANG` value from the system, or `null` if unset.
+ */
+internal fun configureLocaleEnv(
+    env: MutableMap<String, String>,
+    systemLang: String? = System.getenv("LANG"),
+) {
+    val lang = systemLang?.takeIf { it.isNotBlank() } ?: "en_US.UTF-8"
+    env["LANG"] = lang
+    env["LC_ALL"] = lang
 }
