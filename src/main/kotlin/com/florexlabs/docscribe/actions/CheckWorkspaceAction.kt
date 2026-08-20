@@ -41,6 +41,7 @@ class CheckWorkspaceAction : AnAction() {
             var foundRubyFiles = true
 
             override fun run(indicator: ProgressIndicator) {
+                indicator.isIndeterminate = false
                 val files = collectRubyFiles(project, projectRoot)
                 if (files.isEmpty()) {
                     foundRubyFiles = false

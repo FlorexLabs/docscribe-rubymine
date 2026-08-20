@@ -2,6 +2,7 @@ package com.florexlabs.docscribe.actions
 
 import com.florexlabs.docscribe.runner.DocscribeOutputParser
 import com.florexlabs.docscribe.runner.RunResult
+import com.intellij.openapi.application.ReadAction
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.roots.ProjectFileIndex
 import com.intellij.openapi.vfs.LocalFileSystem
@@ -98,15 +99,20 @@ internal fun collectRubyFiles(
     val fileIndex = ProjectFileIndex.getInstance(project)
     val rootDir = LocalFileSystem.getInstance().findFileByIoFile(File(projectRoot)) ?: return emptyList()
     val collected = mutableListOf<String>()
-    VfsUtilCore.iterateChildrenRecursively(
-        rootDir,
-        { f -> !fileIndex.isExcluded(f) },
-    ) { f ->
-        if (!f.isDirectory && isRubyFile(f.name) && fileIndex.isInContent(f)) {
-            collected.add(f.path)
-        }
-        true
-    }
+    ReadAction
+        .nonBlocking(
+            java.util.concurrent.Callable<Unit> {
+                VfsUtilCore.iterateChildrenRecursively(
+                    rootDir,
+                    { f -> !fileIndex.isExcluded(f) },
+                ) { f ->
+                    if (!f.isDirectory && isRubyFile(f.name) && fileIndex.isInContent(f)) {
+                        collected.add(f.path)
+                    }
+                    true
+                }
+            },
+        ).executeSynchronously()
     return collected
 }
 

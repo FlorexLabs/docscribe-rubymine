@@ -24,6 +24,7 @@ import java.net.UnixDomainSocketAddress
 import java.nio.ByteBuffer
 import java.nio.channels.SocketChannel
 import java.nio.charset.StandardCharsets
+import java.nio.file.Files
 import java.nio.file.Path
 import java.util.concurrent.TimeUnit
 import kotlin.concurrent.Volatile
@@ -378,7 +379,11 @@ class DocscribeDaemon(
      */
     private fun ensureRunning(projectDir: String?): ServerHandle? {
         val existing = server
-        if (existing != null && alive) return existing
+        if (existing != null && alive) {
+            if (isServerSocketAlive(existing.socketPath)) return existing
+            log.warn("Docscribe server socket is gone, restarting server")
+            die()
+        }
 
         // One-time check: is the docscribe gem available?
         if (docscribeStatus == DocscribeStatus.UNCHECKED) {
@@ -451,6 +456,10 @@ class DocscribeDaemon(
         val pb = ProcessBuilder(ruby, "-e", script).directory(File(gemRoot))
         val env = pb.environment()
         env.putAll(buildSdkEnvironment())
+
+        // RubyMine may be launched without a locale set, which makes the server
+        // read source files as US-ASCII and fail on non-ASCII content.
+        configureLocaleEnv(env)
 
         val localGemPath = System.getProperty("docscribe.local.gem.path")
         if (localGemPath != null) {
@@ -1183,4 +1192,34 @@ class DocscribeDaemon(
             return if (bundle.canExecute()) bundle.absolutePath else null
         }
     }
+}
+
+/**
+ * Check whether a previously started server socket file still exists.
+ *
+ * The daemon exits after its idle timeout and removes the socket file, so
+ * `alive` alone is not sufficient — a stale handle must trigger a restart.
+ *
+ * @param socketPath The socket file to validate.
+ * @return `true` if the socket file still exists.
+ */
+internal fun isServerSocketAlive(socketPath: Path): Boolean = Files.exists(socketPath)
+
+/**
+ * Force a UTF-8 locale on the server environment.
+ *
+ * RubyMine may be launched without a locale set, which makes Ruby read
+ * source files as US-ASCII and fail on non-ASCII content. Falls back to
+ * `en_US.UTF-8` when `LANG` is unset or blank.
+ *
+ * @param env        The environment map to configure (mutated in place).
+ * @param systemLang The `LANG` value from the system, or `null` if unset.
+ */
+internal fun configureLocaleEnv(
+    env: MutableMap<String, String>,
+    systemLang: String? = System.getenv("LANG"),
+) {
+    val lang = systemLang?.takeIf { it.isNotBlank() } ?: "en_US.UTF-8"
+    env["LANG"] = lang
+    env["LC_ALL"] = lang
 }
