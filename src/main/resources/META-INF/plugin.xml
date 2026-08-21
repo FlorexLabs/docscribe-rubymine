@@ -69,8 +69,8 @@
         </ul>
     ]]></change-notes>
 
-  <version>0.1.5</version>
-  <idea-version since-build="261" until-build="261.*"/>
+  <version>0.1.6</version>
+  <idea-version since-build="261" until-build="262.*"/>
 
   <depends>com.intellij.modules.platform</depends>
   <depends optional="true" config-file="withRubyPlugin.xml">com.intellij.modules.ruby</depends>
@@ -81,7 +81,7 @@
     <applicationService serviceImplementation="com.florexlabs.docscribe.settings.DocscribeSettingsChangeListenerImpl"/>
     <projectService serviceImplementation="com.florexlabs.docscribe.runner.DocscribeDaemon"/>
 
-    <notificationGroup id="DocScribe" displayType="BALLOON" key="DocScribe notifications"/>
+    <notificationGroup id="DocScribe" displayType="BALLOON"/>
 
     <applicationConfigurable
       groupId="tools"

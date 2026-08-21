@@ -1,6 +1,7 @@
 package com.florexlabs.docscribe.runner
 
 import com.google.gson.GsonBuilder
+import com.intellij.notification.NotificationGroup
 import com.intellij.notification.NotificationGroupManager
 import com.intellij.notification.NotificationType
 import com.intellij.openapi.Disposable
@@ -9,7 +10,10 @@ import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.fileEditor.FileEditorManager
+import com.intellij.openapi.module.ModuleManager
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.projectRoots.Sdk
+import com.intellij.openapi.roots.ModuleRootManager
 import com.intellij.openapi.roots.ProjectRootManager
 import com.intellij.openapi.vfs.LocalFileSystem
 import org.jetbrains.annotations.VisibleForTesting
@@ -20,6 +24,7 @@ import java.net.UnixDomainSocketAddress
 import java.nio.ByteBuffer
 import java.nio.channels.SocketChannel
 import java.nio.charset.StandardCharsets
+import java.nio.file.Files
 import java.nio.file.Path
 import java.util.concurrent.TimeUnit
 import kotlin.concurrent.Volatile
@@ -40,6 +45,7 @@ import kotlin.concurrent.Volatile
  *
  * ## RPC methods
  * - `check` — dry-run diagnostics.
+ * - `check_batch` — dry-run diagnostics for multiple files in one call.
  * - `fix` — with `"strategy": "safe"` or `"aggressive"`.
  * - `ping` — health check.
  * - `update_types` — refresh YARD docs from RBS signatures.
@@ -93,10 +99,12 @@ class DocscribeDaemon(
      *
      * @property version      Full version string (e.g. `"1.5.1"`).
      * @property serverMode   Server/daemon mode supported (version >= 1.5.1).
+     * @property batchMode    `check_batch` RPC supported (version >= 1.5.2).
      */
     data class DocscribeCapabilities(
         val version: String,
         val serverMode: Boolean,
+        val batchMode: Boolean = false,
     )
 
     /**
@@ -163,6 +171,83 @@ class DocscribeDaemon(
             val response = performRpcCall(handle, command, params)
             return processRpcResponse(response, command, file, projectDir, formatJson)
         }
+    }
+
+    /**
+     * Execute a `check_batch` RPC against the server, falling back to CLI if needed.
+     *
+     * Sends all [files] in a single RPC call. When the daemon is unavailable or the installed
+     * docscribe version does not support `check_batch` (< 1.5.2), falls back to the directory-scan
+     * CLI mode (same as the pre-batch workspace check).
+     *
+     * @param files      Absolute paths of the Ruby files to check.
+     * @param projectDir Optional project root directory.
+     * @return The [RunResult] containing an aggregated check JSON (see [buildBatchCheckJson]).
+     */
+    fun executeBatch(
+        files: List<String>,
+        projectDir: String? = null,
+    ): RunResult {
+        synchronized(lock) {
+            val handle = ensureRunning(projectDir)
+            if (handle == null || capabilities?.batchMode != true) {
+                log.info("check_batch not available, using CLI directory scan")
+                return fallback("check", file = null, projectDir = projectDir, formatJson = true)
+            }
+            val params = buildBatchParams(files, projectDir ?: project.basePath ?: "")
+            val response = rpcCall(handle, "check_batch", params)
+            return processBatchResponse(response, projectDir)
+        }
+    }
+
+    /**
+     * Convert the raw `check_batch` RPC response into an aggregated [RunResult].
+     *
+     * Per-file results are merged into a single check JSON via [buildBatchCheckJson]:
+     * files with `status` `"ok"`/`"fail"` become file entries with their offenses,
+     * files with status `"error"` are counted in the summary `error_count`.
+     *
+     * @param response  The parsed RPC response, or `null`.
+     * @param projectDir The project root directory.
+     * @return A [RunResult] representing the aggregated batch outcome.
+     */
+    private fun processBatchResponse(
+        response: Map<String, Any?>?,
+        projectDir: String?,
+    ): RunResult {
+        if (response == null) {
+            log.warn("Batch RPC returned null, falling back")
+            return fallback("check", file = null, projectDir = projectDir, formatJson = true)
+        }
+
+        val error = response["error"]
+        if (error != null) {
+            val msg = (error as? Map<*, *>)?.get("message")?.toString() ?: error.toString()
+            return RunResult(success = false, hasIssues = false, exitCode = 1, stdout = "", stderr = "Server error: $msg")
+        }
+
+        val result = response["result"] as? Map<*, *>
+        val results = result?.get("results") as? List<*> ?: emptyList<Any>()
+        val jsonOutput = buildBatchCheckJson(results)
+        val parsed = gson.fromJson(jsonOutput, Map::class.java)
+
+        @Suppress("UNCHECKED_CAST")
+        val parsedMap = parsed as? Map<String, Any?>
+
+        @Suppress("UNCHECKED_CAST")
+        val files = parsedMap?.get("files") as? List<Map<String, Any?>>
+        val totalOffenses = files?.sumOf { f -> (f["offenses"] as? List<*>)?.size ?: 0 } ?: 0
+
+        @Suppress("UNCHECKED_CAST")
+        val summary = parsedMap?.get("summary") as? Map<String, Any?>
+        val totalErrors = (summary?.get("error_count") as? Number)?.toInt() ?: 0
+        return RunResult(
+            success = true,
+            hasIssues = totalOffenses > 0,
+            exitCode = if (totalOffenses > 0 || totalErrors > 0) 1 else 0,
+            stdout = jsonOutput,
+            stderr = "",
+        )
     }
 
     /**
@@ -294,7 +379,11 @@ class DocscribeDaemon(
      */
     private fun ensureRunning(projectDir: String?): ServerHandle? {
         val existing = server
-        if (existing != null && alive) return existing
+        if (existing != null && alive) {
+            if (isServerSocketAlive(existing.socketPath)) return existing
+            log.warn("Docscribe server socket is gone, restarting server")
+            die()
+        }
 
         // One-time check: is the docscribe gem available?
         if (docscribeStatus == DocscribeStatus.UNCHECKED) {
@@ -368,6 +457,10 @@ class DocscribeDaemon(
         val env = pb.environment()
         env.putAll(buildSdkEnvironment())
 
+        // RubyMine may be launched without a locale set, which makes the server
+        // read source files as US-ASCII and fail on non-ASCII content.
+        configureLocaleEnv(env)
+
         val localGemPath = System.getProperty("docscribe.local.gem.path")
         if (localGemPath != null) {
             val libPath = "$localGemPath/lib"
@@ -421,8 +514,16 @@ class DocscribeDaemon(
      * @param message The notification message text.
      */
     private fun showNotification(message: String) {
-        val group = NotificationGroupManager.getInstance().getNotificationGroup("DocScribe")
+        val group = notificationGroup() ?: return
         group.createNotification(message, NotificationType.ERROR).notify(project)
+    }
+
+    private fun notificationGroup(): NotificationGroup? {
+        val group = NotificationGroupManager.getInstance().getNotificationGroup("DocScribe")
+        if (group == null) {
+            log.warn("Notification group 'DocScribe' is not registered")
+        }
+        return group
     }
 
     /**
@@ -444,7 +545,7 @@ class DocscribeDaemon(
 
         try {
             val pb =
-                ProcessBuilder("bundle", "exec", "docscribe", "--version")
+                ProcessBuilder(bundleCommand() ?: "bundle", "exec", "docscribe", "--version")
                     .directory(File(gemRoot))
             pb.environment().putAll(buildSdkEnvironment())
             pb.redirectErrorStream(true)
@@ -483,13 +584,16 @@ class DocscribeDaemon(
      */
     private fun showMissingDocscribeNotification(gemRoot: String) {
         missingNotified = true
+        val group = notificationGroup()
+        if (group == null) {
+            log.warn("Cannot show missing-docscribe notification: group not registered")
+            return
+        }
         val message =
             "docscribe gem not found in project Gemfile. " +
                 "Add 'gem \"docscribe\"' and run 'bundle install'."
         val notification =
-            NotificationGroupManager
-                .getInstance()
-                .getNotificationGroup("DocScribe")
+            group
                 .createNotification(message, NotificationType.ERROR)
         notification.addAction(
             object : AnAction("Open Gemfile") {
@@ -510,12 +614,13 @@ class DocscribeDaemon(
     /**
      * Resolve the Ruby executable path, preferring the project SDK if configured.
      *
-     * Falls back to `PATH` lookup, then to `~/.rbenv/shims/ruby`.
+     * Falls back to the first module SDK (Ruby projects often configure the SDK
+     * per-module only), then to `PATH` lookup and `~/.rbenv/shims/ruby`.
      *
      * @return Path to the Ruby executable, or `null` if none is found.
      */
     private fun rubyCommand(): String? {
-        val sdk = ProjectRootManager.getInstance(project).projectSdk
+        val sdk = resolveRubySdk()
         val homePath = sdk?.homePath
         if (homePath != null) {
             if (homePath.endsWith("ruby") && File(homePath).canExecute()) {
@@ -532,6 +637,46 @@ class DocscribeDaemon(
         log.warn("No Ruby found on PATH or via SDK")
         return null
     }
+
+    /**
+     * Resolve the project's Ruby SDK.
+     *
+     * Tries the project-level SDK first, then falls back to the SDK of any
+     * module, preferring one whose home path looks like a Ruby installation.
+     */
+    private fun resolveRubySdk(): Sdk? {
+        val projSdk = ProjectRootManager.getInstance(project).projectSdk
+        val moduleSdks =
+            ModuleManager
+                .getInstance(project)
+                .modules
+                .mapNotNull { ModuleRootManager.getInstance(it).sdk }
+        val chosenHome = resolveRubyHome(projSdk?.homePath, moduleSdks.map { it.homePath })
+        val chosen =
+            when {
+                chosenHome == null -> null
+                projSdk?.homePath == chosenHome -> projSdk
+                else -> moduleSdks.firstOrNull { it.homePath == chosenHome }
+            }
+        if (chosen != null) {
+            log.info(
+                "DocScribe: Ruby SDK from ${if (projSdk?.homePath == chosenHome) "project" else "module"}: " +
+                    "'${chosen.name}' home=${chosen.homePath}",
+            )
+        } else {
+            log.info("DocScribe: no project or module SDK found, falling back to PATH")
+        }
+        return chosen
+    }
+
+    /**
+     * Absolute path to the SDK's `bundle` executable, or `null` to rely on `PATH`.
+     *
+     * The JVM on macOS resolves bare executable names against its own copy of
+     * `PATH`, which the [buildSdkEnvironment] override does not reliably affect;
+     * using the absolute path guarantees the project's Ruby SDK is used.
+     */
+    private fun bundleCommand(): String? = bundlePathFor(rubyCommand())
 
     /**
      * Search for Ruby on `PATH` or in common version manager locations.
@@ -577,6 +722,7 @@ class DocscribeDaemon(
         if (gemRoot != null) {
             env["BUNDLE_GEMFILE"] = File(gemRoot, "Gemfile").absolutePath
         }
+        log.info("DocScribe: gem check env: ruby=$ruby, BUNDLE_GEMFILE=${env["BUNDLE_GEMFILE"]}, PATH=${env["PATH"]}")
         return env
     }
 
@@ -657,6 +803,7 @@ class DocscribeDaemon(
                 file = file,
                 strategy = strategy,
                 formatJson = formatJson,
+                bundlePath = bundleCommand(),
             )
         val sdkEnv = buildSdkEnvironment()
         val executor = if (sdkEnv.isEmpty()) DefaultCommandExecutor() else DefaultCommandExecutor(sdkEnv)
@@ -694,7 +841,31 @@ class DocscribeDaemon(
         private const val RPC_BUFFER_SIZE = 65536
         private const val RUBY_PATH_LOOKUP_TIMEOUT_SECONDS = 3L
         private const val GEM_CHECK_TIMEOUT_SECONDS = 10L
+        private const val BATCH_PER_FILE_TIMEOUT_SECONDS = 120L
+        private const val SERVER_MODE_MIN_VERSION = "1.5.1"
+        private const val BATCH_MODE_MIN_VERSION = "1.5.2"
         private val sharedGson by lazy { GsonBuilder().create() }
+
+        /**
+         * Build the parameters map sent in a `check_batch` RPC request.
+         *
+         * @param files          Absolute paths of the files to check.
+         * @param projectDir     Project root directory.
+         * @param timeoutSeconds Per-file timeout in seconds.
+         * @return A map of RPC parameters.
+         */
+        @JvmStatic
+        fun buildBatchParams(
+            files: List<String>,
+            projectDir: String,
+            timeoutSeconds: Long = BATCH_PER_FILE_TIMEOUT_SECONDS,
+        ): Map<String, Any?> =
+            mutableMapOf<String, Any?>(
+                "files" to files,
+                "project_dir" to projectDir,
+                "no_boilerplate" to true,
+                "timeout" to timeoutSeconds,
+            )
 
         /**
          * Build a JSON-RPC 2.0 request string.
@@ -756,28 +927,7 @@ class DocscribeDaemon(
             changes: List<*>,
         ): String {
             val gsonLocal = GsonBuilder().create()
-            val offenses =
-                changes.mapNotNull { change ->
-                    if (change is Map<*, *>) {
-                        val line = (change["line"] as? Number)?.toInt() ?: 1
-                        mapOf(
-                            "severity" to "convention",
-                            "cop_name" to "DocScribe/MissingDocumentation",
-                            "message" to "Missing YARD documentation",
-                            "corrected" to false,
-                            "correctable" to true,
-                            "location" to
-                                mapOf(
-                                    "start_line" to line,
-                                    "start_column" to 1,
-                                    "last_line" to line,
-                                    "last_column" to 1,
-                                ),
-                        )
-                    } else {
-                        null
-                    }
-                }
+            val offenses = changesToOffenses(changes)
             val output =
                 mapOf(
                     "metadata" to mapOf("docscribe_version" to "1.5.1"),
@@ -798,6 +948,99 @@ class DocscribeDaemon(
                 )
             return gsonLocal.toJson(output)
         }
+
+        /**
+         * Build an aggregated check JSON from a `check_batch` server response.
+         *
+         * Each batch result must be a map with:
+         * - `"file"` — the absolute file path;
+         * - `"status"` — `"ok"`, `"fail"`, or `"error"`;
+         * - `"changes"` — list of changes (ignored for `"error"` status);
+         * - `"error"` — error message (only for `"error"` status, unused in output).
+         *
+         * Files with status `"ok"`/`"fail"` become file entries with their offenses;
+         * files with status `"error"` are counted in the summary `error_count`.
+         * Non-map entries are skipped.
+         *
+         * @param results The `results` array from the `check_batch` response.
+         * @return A JSON string compatible with [DocscribeOutputParser.parseJson].
+         */
+        fun buildBatchCheckJson(results: List<*>): String {
+            val gsonLocal = GsonBuilder().create()
+            val files = mutableListOf<Map<String, Any>>()
+            var offenseCount = 0
+            var errorCount = 0
+            var targetCount = 0
+
+            val validResults =
+                results.mapNotNull { result ->
+                    if (result is Map<*, *>) {
+                        (result["file"] as? String)?.let { filePath -> filePath to result }
+                    } else {
+                        null
+                    }
+                }
+
+            for ((filePath, result) in validResults) {
+                targetCount++
+                val status = result["status"] as? String ?: "error"
+                if (status == "error") {
+                    errorCount++
+                    continue
+                }
+                val changes = result["changes"] as? List<*> ?: emptyList<Any>()
+                val offenses = changesToOffenses(changes)
+                offenseCount += offenses.size
+                files.add(mapOf("path" to filePath, "offenses" to offenses))
+            }
+
+            val output =
+                mapOf(
+                    "metadata" to mapOf("docscribe_version" to "1.5.1"),
+                    "files" to files,
+                    "summary" to
+                        mapOf(
+                            "offense_count" to offenseCount,
+                            "target_file_count" to targetCount,
+                            "inspected_file_count" to files.size,
+                            "error_count" to errorCount,
+                        ),
+                )
+            return gsonLocal.toJson(output)
+        }
+
+        /**
+         * Convert a list of server changes into offense maps.
+         *
+         * Each change is mapped to an offense with severity `convention`, cop name
+         * `DocScribe/MissingDocumentation`, and the change's line number (default 1).
+         * Non-map elements are skipped.
+         *
+         * @param changes The list of changes from the server response.
+         * @return A list of offense maps.
+         */
+        private fun changesToOffenses(changes: List<*>): List<Map<String, Any>> =
+            changes.mapNotNull { change ->
+                if (change is Map<*, *>) {
+                    val line = (change["line"] as? Number)?.toInt() ?: 1
+                    mapOf(
+                        "severity" to "convention",
+                        "cop_name" to "DocScribe/MissingDocumentation",
+                        "message" to "Missing YARD documentation",
+                        "corrected" to false,
+                        "correctable" to true,
+                        "location" to
+                            mapOf(
+                                "start_line" to line,
+                                "start_column" to 1,
+                                "last_line" to line,
+                                "last_column" to 1,
+                            ),
+                    )
+                } else {
+                    null
+                }
+            }
 
         /**
          * Get the [DocscribeDaemon] instance for the given project.
@@ -862,17 +1105,121 @@ class DocscribeDaemon(
          * Returns `null` for unparseable output (treated as unknown version, server mode disabled).
          *
          * @param versionOutput The trimmed stdout from `bundle exec docscribe --version`.
-         * @return [DocscribeCapabilities] with server mode enabled for version >= 1.5.1.
+         * @return [DocscribeCapabilities] with server mode enabled for version >= 1.5.1
+         *   and batch mode enabled for version >= 1.5.2.
          */
         @JvmStatic
         fun parseVersion(versionOutput: String): DocscribeCapabilities? {
             val version = versionOutput.trim().takeIf { it.matches(Regex("""\d+\.\d+\.\d+""")) } ?: return null
             val parts = version.split(".").map { it.toIntOrNull() ?: return null }
-            val serverMode =
-                parts.size == 3 && (
-                    parts[0] > 1 || (parts[0] == 1 && parts[1] > 5) || (parts[0] == 1 && parts[1] == 5 && parts[2] >= 1)
-                )
-            return DocscribeCapabilities(version = version, serverMode = serverMode)
+            val serverMode = parts.size == 3 && atLeast(parts, SERVER_MODE_MIN_VERSION)
+            val batchMode = parts.size == 3 && atLeast(parts, BATCH_MODE_MIN_VERSION)
+            return DocscribeCapabilities(version = version, serverMode = serverMode, batchMode = batchMode)
+        }
+
+        /**
+         * Compare a parsed version triple against a target version.
+         *
+         * @param parts         The parsed version parts `[major, minor, patch]`.
+         * @param targetVersion Target version string like `"1.5.1"`.
+         * @return `true` if the parsed version is greater than or equal to the target.
+         */
+        private fun atLeast(
+            parts: List<Int>,
+            targetVersion: String,
+        ): Boolean {
+            val target = targetVersion.split(".").map { it.toInt() }
+            return parts[0] > target[0] ||
+                (parts[0] == target[0] && parts[1] > target[1]) ||
+                (parts[0] == target[0] && parts[1] == target[1] && parts[2] >= target[2])
+        }
+
+        /**
+         * Execute a workspace-wide check via `check_batch`, falling back to CLI if the server
+         * or batch support is unavailable.
+         *
+         * Convenience wrapper that resolves the [DocscribeDaemon] instance and delegates to
+         * [executeBatch].
+         *
+         * @param project    The current project.
+         * @param files      Absolute paths of the Ruby files to check.
+         * @param projectDir The project root directory.
+         * @return The [RunResult] from the execution.
+         */
+        fun executeBatchWithFallback(
+            project: Project,
+            files: List<String>,
+            projectDir: String,
+        ): RunResult {
+            val daemon = getInstance(project)
+            return daemon.executeBatch(files, projectDir)
+        }
+
+        /**
+         * Choose the Ruby home path to use for docscribe invocations.
+         *
+         * Priority: project-level SDK home, then the first module SDK home whose path
+         * looks like a Ruby installation (ends with `ruby`), then any module SDK home.
+         *
+         * @param projectHome The project-level SDK home path, or `null`.
+         * @param moduleHomes Home paths of all module-level SDKs, in module order.
+         * @return The chosen home path, or `null` when no SDK is configured.
+         */
+        @JvmStatic
+        fun resolveRubyHome(
+            projectHome: String?,
+            moduleHomes: List<String?>,
+        ): String? {
+            if (!projectHome.isNullOrBlank()) return projectHome
+            moduleHomes.firstOrNull { it?.endsWith("ruby") == true }?.let { return it }
+            return moduleHomes.firstOrNull { !it.isNullOrBlank() }
+        }
+
+        /**
+         * Absolute path to the `bundle` executable next to the given Ruby binary.
+         *
+         * The JVM on macOS resolves bare executable names against its own copy of
+         * `PATH`, which a `PATH` environment override does not reliably affect; the
+         * absolute path guarantees the project's Ruby SDK is used.
+         *
+         * @param rubyPath Path to the Ruby executable (SDK `homePath`), or `null`.
+         * @return Absolute path to `bundle` when it exists and is executable, else `null`.
+         */
+        @JvmStatic
+        fun bundlePathFor(rubyPath: String?): String? {
+            if (rubyPath.isNullOrBlank()) return null
+            val bundle = File(File(rubyPath).parentFile, "bundle")
+            return if (bundle.canExecute()) bundle.absolutePath else null
         }
     }
+}
+
+/**
+ * Check whether a previously started server socket file still exists.
+ *
+ * The daemon exits after its idle timeout and removes the socket file, so
+ * `alive` alone is not sufficient — a stale handle must trigger a restart.
+ *
+ * @param socketPath The socket file to validate.
+ * @return `true` if the socket file still exists.
+ */
+internal fun isServerSocketAlive(socketPath: Path): Boolean = Files.exists(socketPath)
+
+/**
+ * Force a UTF-8 locale on the server environment.
+ *
+ * RubyMine may be launched without a locale set, which makes Ruby read
+ * source files as US-ASCII and fail on non-ASCII content. Falls back to
+ * `en_US.UTF-8` when `LANG` is unset or blank.
+ *
+ * @param env        The environment map to configure (mutated in place).
+ * @param systemLang The `LANG` value from the system, or `null` if unset.
+ */
+internal fun configureLocaleEnv(
+    env: MutableMap<String, String>,
+    systemLang: String? = System.getenv("LANG"),
+) {
+    val lang = systemLang?.takeIf { it.isNotBlank() } ?: "en_US.UTF-8"
+    env["LANG"] = lang
+    env["LC_ALL"] = lang
 }
