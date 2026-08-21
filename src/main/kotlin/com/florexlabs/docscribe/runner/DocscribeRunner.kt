@@ -173,6 +173,17 @@ object DocscribeRunner {
         strategy: DocscribeStrategy,
         formatJson: Boolean,
         filePath: String? = null,
+    ): List<String> = getCommandArgs(strategy, formatJson, filePath, useRbs = false, useRbsCollection = false)
+
+    /**
+     * Overload with explicit RBS flags.
+     */
+    fun getCommandArgs(
+        strategy: DocscribeStrategy,
+        formatJson: Boolean,
+        filePath: String?,
+        useRbs: Boolean,
+        useRbsCollection: Boolean,
     ): List<String> {
         val args = mutableListOf<String>()
         when (strategy) {
@@ -186,6 +197,10 @@ object DocscribeRunner {
             }
 
             DocscribeStrategy.CHECK -> {}
+        }
+        if (useRbs) {
+            args.add("--rbs")
+            if (useRbsCollection) args.add("--rbs-collection")
         }
         if (formatJson && strategy == DocscribeStrategy.CHECK) {
             args.addAll(listOf("--format", "json"))
@@ -212,11 +227,19 @@ object DocscribeRunner {
         executor: CommandExecutor = DefaultCommandExecutor(),
     ): RunResult {
         val projectRoot = options.projectDir
+        val useRbs = RbsDetector.shouldUseRbs(projectRoot)
+        val useCollection = useRbs && RbsDetector.hasCollection(projectRoot)
         val args =
             if (options.subcommand != null) {
                 listOf(options.subcommand, projectRoot)
             } else {
-                getCommandArgs(options.strategy, options.formatJson, options.file)
+                getCommandArgs(
+                    options.strategy,
+                    options.formatJson,
+                    options.file,
+                    useRbs,
+                    useCollection,
+                )
             }
         return executor.execute(options.bundlePath ?: "bundle", listOf("exec", "docscribe") + args, projectRoot)
     }
