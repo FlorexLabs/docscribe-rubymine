@@ -260,12 +260,26 @@ class DocscribeDaemon(
     private fun buildExecuteParams(
         file: String?,
         projectDir: String?,
-    ): Map<String, Any?> =
-        mutableMapOf<String, Any?>(
-            "file" to file,
-            "project_dir" to (projectDir ?: project.basePath ?: ""),
-            "no_boilerplate" to true,
-        )
+    ): Map<String, Any?> {
+        val dir = projectDir ?: project.basePath ?: ""
+        val map =
+            mutableMapOf<String, Any?>(
+                "file" to file,
+                "project_dir" to dir,
+                "no_boilerplate" to true,
+            )
+        val cliOverrides = buildRbsCliOverrides(dir)
+        if (cliOverrides != null) map["cli_overrides"] = cliOverrides
+        return map
+    }
+
+    private fun buildRbsCliOverrides(projectDir: String): Map<String, Any?>? {
+        if (!RbsDetector.shouldUseRbs(projectDir)) return null
+        val overrides = mutableMapOf<String, Any?>("rbs" to true)
+        if (RbsDetector.hasCollection(projectDir)) overrides["rbs_collection"] = true
+        // sig_dirs from default ['sig'] already handled by gem when rbs=true
+        return overrides
+    }
 
     /**
      * Route [command] to the appropriate RPC method and execute it.
@@ -859,13 +873,26 @@ class DocscribeDaemon(
             files: List<String>,
             projectDir: String,
             timeoutSeconds: Long = BATCH_PER_FILE_TIMEOUT_SECONDS,
-        ): Map<String, Any?> =
-            mutableMapOf<String, Any?>(
-                "files" to files,
-                "project_dir" to projectDir,
-                "no_boilerplate" to true,
-                "timeout" to timeoutSeconds,
-            )
+        ): Map<String, Any?> {
+            val map =
+                mutableMapOf<String, Any?>(
+                    "files" to files,
+                    "project_dir" to projectDir,
+                    "no_boilerplate" to true,
+                    "timeout" to timeoutSeconds,
+                )
+            val cliOverrides = buildRbsCliOverridesStatic(projectDir)
+            if (cliOverrides != null) map["cli_overrides"] = cliOverrides
+            return map
+        }
+
+        @JvmStatic
+        internal fun buildRbsCliOverridesStatic(projectDir: String): Map<String, Any?>? {
+            if (!RbsDetector.shouldUseRbs(projectDir)) return null
+            val overrides = mutableMapOf<String, Any?>("rbs" to true)
+            if (RbsDetector.hasCollection(projectDir)) overrides["rbs_collection"] = true
+            return overrides
+        }
 
         /**
          * Build a JSON-RPC 2.0 request string.
