@@ -4,6 +4,7 @@ import com.florexlabs.docscribe.runner.DocscribeDaemon
 import com.florexlabs.docscribe.runner.DocscribeDaemon.DocscribeCapabilities
 import com.florexlabs.docscribe.runner.DocscribeDaemon.DocscribeStatus
 import com.florexlabs.docscribe.runner.DocscribeRunner
+import com.florexlabs.docscribe.runner.RbsDetector
 import com.florexlabs.docscribe.settings.DocscribeSettings
 import com.intellij.notification.NotificationGroupManager
 import com.intellij.notification.NotificationType
@@ -21,6 +22,7 @@ import java.io.File
  * daemon server state, plugin settings. Calls none of the query methods
  * trigger side effects — they read cached state.
  */
+@Suppress("TooManyFunctions")
 class DoctorAction : AnAction() {
     override fun actionPerformed(e: AnActionEvent) {
         val project = e.project ?: return
@@ -60,6 +62,8 @@ class DoctorAction : AnAction() {
         lines += rubySdkLines(project, daemon)
         lines += ""
         lines += gemInfoLines(status, caps)
+        lines += ""
+        lines += rbsInfoLines(gemRoot)
         lines += ""
         lines += daemonInfoLines(project, status, caps)
         lines += ""
@@ -118,6 +122,51 @@ class DoctorAction : AnAction() {
             lines += "  Version: ${caps.version}"
             lines += "  Server mode: ${if (caps.serverMode) "supported (>= 1.5.1)" else "not available (< 1.5.1)"}"
         }
+        return lines
+    }
+
+    /**
+     * RBS status: sig dir, rbs gem, collection, docscribe.yml flag.
+     */
+    @Suppress("CyclomaticComplexMethod")
+    private fun rbsInfoLines(gemRoot: String?): List<String> {
+        if (gemRoot == null) return listOf("RBS: project root not found")
+        val hasSig =
+            try {
+                val sig = File(gemRoot, "sig")
+                sig.isDirectory && sig.walkTopDown().any { it.isFile && it.extension == "rbs" }
+            } catch (_: Exception) {
+                false
+            }
+        val sigStatus = if (hasSig) "found (sig/ contains *.rbs)" else "not found (no sig/*.rbs)"
+        val rbsInLock =
+            try {
+                val lock = File(gemRoot, "Gemfile.lock")
+                lock.isFile && Regex("""^\s+rbs\s\(""", RegexOption.MULTILINE).containsMatchIn(lock.readText())
+            } catch (_: Exception) {
+                false
+            }
+        val rbsInGemfile =
+            try {
+                val gf = File(gemRoot, "Gemfile")
+                gf.isFile && Regex("""gem\s+['"]rbs['"]""").containsMatchIn(gf.readText())
+            } catch (_: Exception) {
+                false
+            }
+        val rbsGemStatus =
+            when {
+                rbsInLock -> "found in Gemfile.lock"
+                rbsInGemfile -> "declared in Gemfile (run bundle install)"
+                else -> "not found"
+            }
+        val collection = File(gemRoot, "rbs_collection.lock.yaml").exists()
+        val enabled = RbsDetector.shouldUseRbs(gemRoot)
+        val lines = mutableListOf("RBS:")
+        lines += "  sig/: $sigStatus"
+        lines += "  rbs gem: $rbsGemStatus"
+        lines += "  rbs_collection.lock.yaml: ${if (collection) "found" else "not found"}"
+        lines += "  rbs.enabled: ${if (enabled) "true (RBS types will be used)" else "false (heuristic inference only)"}"
+        if (hasSig && !enabled) lines += "  (sig/ exists but rbs.enabled is false → set rbs.enabled: true in docscribe.yml to enable)"
         return lines
     }
 
