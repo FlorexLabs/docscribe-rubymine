@@ -4,6 +4,7 @@ import com.florexlabs.docscribe.runner.DocscribeDaemon
 import com.florexlabs.docscribe.runner.DocscribeOutput
 import com.florexlabs.docscribe.runner.DocscribeOutputParser
 import com.florexlabs.docscribe.runner.DocscribeStrategy
+import com.florexlabs.docscribe.runner.RbsDetector
 import com.florexlabs.docscribe.runner.RunOptions
 import com.florexlabs.docscribe.settings.DocscribeSettings
 import com.intellij.lang.annotation.AnnotationHolder
@@ -22,9 +23,8 @@ import java.util.concurrent.ConcurrentHashMap
 /**
  * Information collected by the annotator before running the background check.
  *
- * @property configHash Hash of [DocscribeSettings] used as part of the cache key.
- *   When settings change, the hash changes, causing cache misses and forcing re-annotation
- *   with the new settings.
+ * @property configHash Hash of [DocscribeSettings] plus RBS file states used as part of the cache key.
+ *   When settings or RBS signatures change, the hash changes, causing cache misses and forcing re-annotation.
  */
 data class AnnotatorFileInfo(
     val filePath: String,
@@ -46,10 +46,9 @@ data class AnnotatorFileInfo(
  * while an older one is still running, the older result is discarded on completion.
  *
  * ## Cache invalidation
- * The [AnnotatorFileInfo.configHash] is derived from [DocscribeSettings], so changing settings
- * (e.g. `hideCommentsByDefault`) automatically invalidates cached annotations by producing a
- * different configHash. The DocscribeSettingsChangeListener also clears the cache explicitly
- * on settings change.
+ * The [AnnotatorFileInfo.configHash] is derived from [DocscribeSettings] plus RBS file states,
+ * so changing settings or RBS signatures automatically invalidates cached annotations.
+ * The DocscribeSettingsChangeListener also clears the cache explicitly on settings change.
  */
 class DocscribeAnnotator : ExternalAnnotator<AnnotatorFileInfo, DocscribeOutput>() {
     /**
@@ -74,7 +73,7 @@ class DocscribeAnnotator : ExternalAnnotator<AnnotatorFileInfo, DocscribeOutput>
         // Skip unsaved documents — docscribe reads from disk, not from editor buffer
         if (FileDocumentManager.getInstance().isDocumentUnsaved(editor.document)) return null
 
-        val configHash = Objects.hash(DocscribeSettings.getInstance().hideCommentsByDefault)
+        val configHash = Objects.hash(DocscribeSettings.getInstance().hideCommentsByDefault, RbsDetector.rbsHash(projectDir))
 
         return AnnotatorFileInfo(
             filePath = vFile.path,
@@ -98,7 +97,7 @@ class DocscribeAnnotator : ExternalAnnotator<AnnotatorFileInfo, DocscribeOutput>
         val vFile = file.virtualFile ?: return null
         val projectDir = file.project.basePath ?: return null
 
-        val configHash = Objects.hash(DocscribeSettings.getInstance().hideCommentsByDefault)
+        val configHash = Objects.hash(DocscribeSettings.getInstance().hideCommentsByDefault, RbsDetector.rbsHash(projectDir))
 
         return AnnotatorFileInfo(
             filePath = vFile.path,
@@ -193,6 +192,8 @@ class DocscribeAnnotator : ExternalAnnotator<AnnotatorFileInfo, DocscribeOutput>
         }
     }
 
+    // noinspection CompanionObjectInExtension
+    @Suppress("CompanionObjectInExtension")
     companion object {
         /**
          * Generation counter per file path.

@@ -32,9 +32,34 @@ object RbsDetector {
      * @param projectDir Project root.
      * @return true if collection lock file exists.
      */
-    fun hasCollection(projectDir: String): Boolean {
-        if (projectDir.isBlank()) return false
-        return File(projectDir, "rbs_collection.lock.yaml").exists()
+    fun hasCollection(projectDir: String): Boolean = projectDir.isNotBlank() && File(projectDir, "rbs_collection.lock.yaml").exists()
+
+    /**
+     * Hash capturing RBS-relevant file states for cache invalidation.
+     * Includes enabled flag, collection presence, docscribe.yml mtime and RBS files in sig.
+     */
+    @Suppress("MagicNumber")
+    fun rbsHash(projectDir: String): Int {
+        if (projectDir.isBlank()) return 0
+        var hash = shouldUseRbs(projectDir).hashCode()
+        hash = 31 * hash + hasCollection(projectDir).hashCode()
+        findDocscribeYml(projectDir)?.let { hash = 31 * hash + it.lastModified().hashCode() }
+        val sigDir = File(projectDir, "sig")
+        if (sigDir.isDirectory) {
+            try {
+                sigDir
+                    .walkTopDown()
+                    .filter { it.isFile && it.extension == "rbs" }
+                    .forEach {
+                        hash = 31 * hash + it.name.hashCode()
+                        hash = 31 * hash + it.lastModified().hashCode()
+                        hash = 31 * hash + it.length().hashCode()
+                    }
+            } catch (_: Exception) {
+                // ignore walk errors
+            }
+        }
+        return hash
     }
 
     private fun readExplicitRbsEnabled(projectDir: String): Boolean? {
@@ -73,34 +98,34 @@ object RbsDetector {
 
     private fun hasSigFiles(projectDir: String): Boolean {
         val sigDir = File(projectDir, "sig")
-        if (!sigDir.isDirectory) return false
-        return try {
-            sigDir.walkTopDown().any { it.isFile && it.extension == "rbs" }
-        } catch (_: Exception) {
-            false
-        }
+        return sigDir.isDirectory &&
+            try {
+                sigDir.walkTopDown().any { it.isFile && it.extension == "rbs" }
+            } catch (_: Exception) {
+                false
+            }
     }
 
     private fun hasRbsInLock(projectDir: String): Boolean {
         val lock = File(projectDir, "Gemfile.lock")
-        if (!lock.isFile) return false
-        return try {
-            val text = lock.readText()
-            // Gemfile.lock lists gems as indented "    rbs (4.1.3)"
-            Regex("""^\s+rbs\s\(""", RegexOption.MULTILINE).containsMatchIn(text)
-        } catch (_: Exception) {
-            false
-        }
+        return lock.isFile &&
+            try {
+                val text = lock.readText()
+                // Gemfile.lock lists gems as indented "    rbs (4.1.3)"
+                Regex("""^\s+rbs\s\(""", RegexOption.MULTILINE).containsMatchIn(text)
+            } catch (_: Exception) {
+                false
+            }
     }
 
     private fun hasRbsInGemfile(projectDir: String): Boolean {
         val gemfile = File(projectDir, "Gemfile")
-        if (!gemfile.isFile) return false
-        return try {
-            val text = gemfile.readText()
-            Regex("""gem\s+['"]rbs['"]""").containsMatchIn(text)
-        } catch (_: Exception) {
-            false
-        }
+        return gemfile.isFile &&
+            try {
+                val text = gemfile.readText()
+                Regex("""gem\s+['"]rbs['"]""").containsMatchIn(text)
+            } catch (_: Exception) {
+                false
+            }
     }
 }
