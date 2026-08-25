@@ -46,15 +46,13 @@ intellijPlatform {
 
         changeNotes =
             """
-            <p>DocScribe 0.1.6: batched workspace checking, RubyMine 2026.1 – 2026.2 support.</p>
+            <p>DocScribe 0.1.7: RBS-aware inspections, Doctor RBS status, MCP API and i18n.</p>
             <ul>
-                <li>Workspace check now sends all Ruby files to the daemon in a single batch RPC call</li>
-                <li>Workspace check shows progress and can be cancelled</li>
-                <li>Requires docscribe gem &gt;= 1.5.2 for batch mode (falls back to CLI otherwise)</li>
-                <li>Supports RubyMine 2026.1 and 2026.2</li>
-                <li>Auto-generate YARD documentation for Ruby methods</li>
-                <li>Check file / workspace diagnostics</li>
-                <li>Safe and aggressive fix actions</li>
+                <li>RBS-aware check / safe fix / aggressive fix / workspace batch via auto-detect <code>sig/*.rbs</code> or <code>rbs</code> gem</li>
+                <li>Doctor shows <code>sig/</code>, <code>rbs</code> gem and <code>rbs.enabled</code></li>
+                <li>Annotator cache invalidates on RBS changes</li>
+                <li>Update Types via daemon with CLI fallback for old gems</li>
+                <li>MCP toolset for API testing (6 tools) and English/Russian localizations</li>
             </ul>
             """.trimIndent()
     }
