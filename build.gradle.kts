@@ -3,6 +3,7 @@ import org.jetbrains.intellij.platform.gradle.TestFrameworkType
 plugins {
     id("java")
     id("org.jetbrains.kotlin.jvm") version "2.3.0"
+    id("org.jetbrains.kotlin.plugin.serialization") version "2.3.0"
     id("org.jetbrains.intellij.platform") version "2.16.0"
     id("com.diffplug.spotless") version "8.6.0"
     id("dev.detekt") version "2.0.0-alpha.4"
@@ -24,9 +25,11 @@ dependencies {
     intellijPlatform {
         rubymine("2026.1")
         bundledPlugin("org.jetbrains.plugins.ruby")
+        bundledPlugin("com.intellij.mcpServer")
         testFramework(TestFrameworkType.Platform)
     }
 
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
     testImplementation("junit:junit:4.13.2")
 }
 

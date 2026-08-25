@@ -74,13 +74,9 @@
 
   <depends>com.intellij.modules.platform</depends>
   <depends optional="true" config-file="withRubyPlugin.xml">com.intellij.modules.ruby</depends>
+  <depends optional="true" config-file="withMcpServer.xml">com.intellij.mcpServer</depends>
 
   <extensions defaultExtensionNs="com.intellij">
-    <applicationService serviceImplementation="com.florexlabs.docscribe.settings.DocscribeSettings"/>
-    <applicationService serviceImplementation="com.florexlabs.docscribe.annotator.DocscribeAnnotatorCache"/>
-    <applicationService serviceImplementation="com.florexlabs.docscribe.settings.DocscribeSettingsChangeListenerImpl"/>
-    <projectService serviceImplementation="com.florexlabs.docscribe.runner.DocscribeDaemon"/>
-
     <notificationGroup id="DocScribe" displayType="BALLOON"/>
 
     <applicationConfigurable
