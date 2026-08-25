@@ -167,10 +167,24 @@ class DocscribeDaemon(
     ): RunResult {
         synchronized(lock) {
             val handle = ensureRunning(projectDir) ?: return fallback(command, file, projectDir, formatJson)
-            val params = buildExecuteParams(file, projectDir)
+            val params = if (command == "update_types") buildUpdateTypesParams(projectDir) else buildExecuteParams(file, projectDir)
             val response = performRpcCall(handle, command, params)
+            // Fallback for older daemons that don't support update_types (< 1.6.2)
+            if (command == "update_types" && isUnknownMethodError(response)) {
+                log.warn("Daemon doesn't support update_types, falling back to CLI")
+                return fallback(command, file, projectDir, formatJson)
+            }
             return processRpcResponse(response, command, file, projectDir, formatJson)
         }
+    }
+
+    @VisibleForTesting
+    internal fun isUnknownMethodError(response: Map<String, Any?>?): Boolean = Companion.isUnknownMethodError(response)
+
+    @VisibleForTesting
+    internal fun buildUpdateTypesParams(projectDir: String?): Map<String, Any?> {
+        val dir = projectDir ?: project.basePath ?: "."
+        return Companion.buildUpdateTypesParams(dir)
     }
 
     /**
@@ -299,7 +313,7 @@ class DocscribeDaemon(
             "safe_fix" -> rpcCall(handle, "fix", params + mapOf("strategy" to "safe"))
             "aggressive_fix" -> rpcCall(handle, "fix", params + mapOf("strategy" to "aggressive"))
             "ping" -> rpcCall(handle, "ping")
-            "update_types" -> rpcCall(handle, "update_types")
+            "update_types" -> rpcCall(handle, "update_types", params)
             else -> null
         }
 
@@ -892,6 +906,22 @@ class DocscribeDaemon(
             val overrides = mutableMapOf<String, Any?>("rbs" to true)
             if (RbsDetector.hasCollection(projectDir)) overrides["rbs_collection"] = true
             return overrides
+        }
+
+        @VisibleForTesting
+        @Suppress("MagicNumber")
+        internal fun isUnknownMethodError(response: Map<String, Any?>?): Boolean {
+            val error = response?.get("error") as? Map<*, *> ?: return false
+            val code = (error["code"] as? Number)?.toInt() ?: return false
+            return code == -32601
+        }
+
+        @VisibleForTesting
+        internal fun buildUpdateTypesParams(projectDir: String): Map<String, Any?> {
+            val map = mutableMapOf<String, Any?>("dir" to projectDir)
+            val cliOverrides = buildRbsCliOverridesStatic(projectDir)
+            if (cliOverrides != null) map["cli_overrides"] = cliOverrides
+            return map
         }
 
         /**

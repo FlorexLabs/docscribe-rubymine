@@ -77,4 +77,43 @@ class GetCommandArgsTest {
             )
         assertEquals(listOf("-A", "-k", "-B", "lib/foo.rb"), args)
     }
+
+    @Test
+    fun `check mode with rbs adds rbs flag`() {
+        val args =
+            DocscribeRunner.getCommandArgs(
+                strategy = DocscribeStrategy.CHECK,
+                formatJson = true,
+                filePath = "a.rb",
+                useRbs = true,
+                useRbsCollection = false,
+            )
+        assertEquals(listOf("--rbs", "--format", "json", "a.rb"), args)
+    }
+
+    @Test
+    fun `check mode with rbs collection adds both flags`() {
+        val args =
+            DocscribeRunner.getCommandArgs(
+                strategy = DocscribeStrategy.CHECK,
+                formatJson = false,
+                filePath = null,
+                useRbs = true,
+                useRbsCollection = true,
+            )
+        assertEquals(listOf("--rbs", "--rbs-collection"), args)
+    }
+
+    @Test
+    fun `safe mode with rbs adds rbs before file`() {
+        val args =
+            DocscribeRunner.getCommandArgs(
+                strategy = DocscribeStrategy.SAFE,
+                formatJson = false,
+                filePath = "foo.rb",
+                useRbs = true,
+                useRbsCollection = false,
+            )
+        assertEquals(listOf("-a", "-B", "--rbs", "foo.rb"), args)
+    }
 }
