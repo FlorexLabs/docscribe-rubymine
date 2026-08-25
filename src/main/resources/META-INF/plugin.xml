@@ -2,6 +2,7 @@
   <id>com.florexlabs.docscribe</id>
   <name>DocScribe</name>
   <vendor>FlorexLabs</vendor>
+  <resource-bundle>messages.DocScribeBundle</resource-bundle>
 
   <description><![CDATA[
         <p>Auto-generate inline YARD documentation for Ruby methods using <a href="https://github.com/unurgunite/docscribe">docscribe</a>.</p>
