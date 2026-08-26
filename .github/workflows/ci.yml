@@ -13,6 +13,15 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha }}
 
+      - name: Ensure MCP not in stdlib
+        run: |
+          if [ -d "src/main/kotlin/com/florexlabs/docscribe/mcp" ] || [ -f "src/main/resources/META-INF/withMcpServer.xml" ]; then
+            echo "❌ MCP files must not be in src/main for CI (run ./gradlew disableMcp before push)"
+            echo "   Found: src/main/.../mcp or withMcpServer.xml"
+            exit 1
+          fi
+          echo "✅ No MCP in stdlib"
+
       - uses: actions/setup-java@v4
         with:
           java-version: 21

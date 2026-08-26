@@ -13,8 +13,6 @@ plugins {
 group = "com.florexlabs"
 version = providers.gradleProperty("pluginVersion").get()
 
-val mcpEnabled = findProperty("mcpTest") == "true"
-
 repositories {
     mavenCentral()
     intellijPlatform {
@@ -27,27 +25,12 @@ dependencies {
     intellijPlatform {
         rubymine("2026.1")
         bundledPlugin("org.jetbrains.plugins.ruby")
-        if (mcpEnabled) bundledPlugin("com.intellij.mcpServer")
+        bundledPlugin("com.intellij.mcpServer")
         testFramework(TestFrameworkType.Platform)
     }
 
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.1")
     testImplementation("junit:junit:4.13.2")
-}
-
-sourceSets {
-    // mcp code lives outside main — only included in buildPlugin when -PmcpTest=true
-    if (mcpEnabled) {
-        named("main") {
-            kotlin.srcDir("src/mcp/kotlin")
-            resources.srcDir("src/mcp/resources")
-        }
-    }
-    test {
-        kotlin {
-            exclude("**/mcp/**")
-        }
-    }
 }
 
 intellijPlatform {
@@ -130,5 +113,31 @@ tasks {
     withType<Test> {
         // MCP toolset is heavy (mcpServer 262+) and not needed for unit tests — exclude to keep CI 7m
         exclude("**/mcp/**")
+    }
+    register("enableMcp") {
+        description = "Copy MCP toolset from src/mcp to src/main for local testing via JetBrains MCP"
+        group = "docscribe"
+        notCompatibleWithConfigurationCache("uses project.copy")
+        doLast {
+            copy {
+                from("src/mcp/kotlin/com/florexlabs/docscribe/mcp")
+                into("src/main/kotlin/com/florexlabs/docscribe/mcp")
+            }
+            copy {
+                from("src/mcp/resources/META-INF/withMcpServer.xml")
+                into("src/main/resources/META-INF")
+            }
+            println("✅ MCP enabled — run ./gradlew buildPlugin to include 6 tools in zip")
+        }
+    }
+    register("disableMcp") {
+        description = "Remove MCP toolset from src/main before push (keep CI 7m)"
+        group = "docscribe"
+        notCompatibleWithConfigurationCache("uses project.delete")
+        doLast {
+            delete("src/main/kotlin/com/florexlabs/docscribe/mcp")
+            delete("src/main/resources/META-INF/withMcpServer.xml")
+            println("✅ MCP disabled — CI will not see MCP files")
+        }
     }
 }
