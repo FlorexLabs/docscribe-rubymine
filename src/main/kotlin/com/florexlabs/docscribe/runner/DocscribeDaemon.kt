@@ -566,7 +566,11 @@ class DocscribeDaemon(
     private fun currentGemfileLockMtime(): Long {
         val gemRoot = DocscribeRunner.findProjectRoot(project.basePath ?: "") ?: return -1
         val lock = File(gemRoot, "Gemfile.lock")
-        return try { if (lock.isFile) lock.lastModified() else -1 } catch (_: Exception) { -1 }
+        return try {
+            if (lock.isFile) lock.lastModified() else -1
+        } catch (_: Exception) {
+            -1
+        }
     }
 
     @VisibleForTesting
