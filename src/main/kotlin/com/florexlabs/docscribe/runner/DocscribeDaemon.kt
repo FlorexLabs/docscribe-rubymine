@@ -573,6 +573,7 @@ class DocscribeDaemon(
         }
     }
 
+    @Suppress("CyclomaticComplexMethod")
     @VisibleForTesting
     internal fun performGemCheck() {
         val curMtime = currentGemfileLockMtime()
