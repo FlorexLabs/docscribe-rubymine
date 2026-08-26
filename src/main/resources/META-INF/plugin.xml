@@ -19,6 +19,36 @@
     ]]></description>
 
   <change-notes><![CDATA[
+        <h3>0.1.7</h3>
+        <h4>Added</h4>
+        <ul>
+            <li>RBS-aware inspections — check / safe fix / aggressive fix / workspace batch now auto-detect RBS via <code>sig/*.rbs</code>, <code>Gemfile.lock</code> or <code>docscribe.yml</code> (<code>rbs.enabled</code>) and forward <code>--rbs</code>/<code>--rbs-collection</code> to daemon and CLI</li>
+            <li>Doctor RBS status — new RBS section showing <code>sig/</code>, <code>rbs</code> gem, <code>rbs_collection.lock.yaml</code> and <code>rbs.enabled</code></li>
+            <li>Annotator cache invalidation on RBS changes — <code>configHash</code> now includes RBS file states (<code>sig/*.rbs</code> mtimes)</li>
+            <li>MCP API for testing — <code>DocScribeMcpToolset</code> exposing 6 tools (<code>check_file</code>, <code>check_workspace</code>, <code>safe_fix</code>, <code>aggressive_fix</code>, <code>update_types</code>, <code>doctor</code>) via JetBrains MCP</li>
+            <li>i18n — English and Russian localizations for actions and settings via <code>messages.DocScribeBundle</code></li>
+        </ul>
+        <h4>Fixed</h4>
+        <ul>
+            <li><code>Update Types from RBS</code> via daemon — now sends <code>dir</code> and <code>cli_overrides</code> and falls back to CLI for old gems (&lt; 1.6.2) on <code>Unknown method</code></li>
+            <li>Companion object warning in <code>DocscribeAnnotator</code> — suppressed <code>CompanionObjectInExtension</code></li>
+        </ul>
+        <h3>0.1.6</h3>
+        <h4>Added</h4>
+        <ul>
+            <li>Batch workspace check — single <code>check_batch</code> RPC for all Ruby files</li>
+            <li>Batch capability detection — <code>batchMode</code> for &gt;= 1.5.2, fallback to CLI scan otherwise</li>
+        </ul>
+        <h4>Changed</h4>
+        <ul>
+            <li>Workspace check in chunks (10 files) with progress and cancellation</li>
+            <li>Target IDE 2026.1 – 2026.2, verification against 2026.1.5 / 2026.2 / 2026.2.1</li>
+        </ul>
+        <h4>Fixed</h4>
+        <ul>
+            <li>Workspace check no-op in server mode — now enumerates files and uses batch endpoint</li>
+            <li>Gem check used system Ruby on macOS — now resolves SDK <code>bundle</code> by absolute path</li>
+        </ul>
         <h3>0.1.5</h3>
         <h4>Added</h4>
         <ul>
