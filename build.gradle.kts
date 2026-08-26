@@ -33,6 +33,14 @@ dependencies {
     testImplementation("junit:junit:4.13.2")
 }
 
+sourceSets {
+    test {
+        kotlin {
+            exclude("**/mcp/**")
+        }
+    }
+}
+
 intellijPlatform {
     pluginConfiguration {
         id = "com.florexlabs.docscribe"
@@ -109,5 +117,12 @@ tasks {
         if (localGemPath != null) {
             jvmArgs(listOf("-Ddocscribe.local.gem.path=$localGemPath"))
         }
+    }
+    withType<Test> {
+        // MCP toolset is heavy (mcpServer 262+) and not needed for unit tests — exclude to keep CI 7m
+        exclude("**/mcp/**")
+    }
+    named("instrumentTestCode") {
+        exclude("com/florexlabs/docscribe/mcp/**")
     }
 }
