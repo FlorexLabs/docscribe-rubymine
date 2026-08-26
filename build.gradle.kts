@@ -122,7 +122,4 @@ tasks {
         // MCP toolset is heavy (mcpServer 262+) and not needed for unit tests — exclude to keep CI 7m
         exclude("**/mcp/**")
     }
-    named("instrumentTestCode") {
-        exclude("com/florexlabs/docscribe/mcp/**")
-    }
 }
