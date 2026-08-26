@@ -36,6 +36,7 @@ class DocScribeMcpToolset : McpToolset {
             false
         }
     }
+
     @Serializable
     data class CheckResult(
         val projectPath: String?,
