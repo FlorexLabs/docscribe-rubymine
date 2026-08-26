@@ -27,7 +27,7 @@ class DocScribeMcpToolset : McpToolset {
         // Only enable when at least one open project looks like a DocScribe project (has Gemfile with docscribe)
         // This prevents the toolset from being instantiated in unrelated projects and in tests without a project
         return try {
-            ProjectManager.getInstance().openProjects.any { p ->
+            com.intellij.openapi.project.ProjectManager.getInstance().openProjects.any { p ->
                 val base = p.basePath ?: return@any false
                 val gemfile = java.io.File(base, "Gemfile")
                 gemfile.isFile && gemfile.readText().contains("docscribe")
@@ -36,7 +36,6 @@ class DocScribeMcpToolset : McpToolset {
             false
         }
     }
-
     @Serializable
     data class CheckResult(
         val projectPath: String?,
