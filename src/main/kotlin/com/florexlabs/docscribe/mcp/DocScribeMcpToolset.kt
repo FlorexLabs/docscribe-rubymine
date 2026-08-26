@@ -54,7 +54,12 @@ class DocScribeMcpToolset : McpToolset {
         projectPath: String?,
         filePath: String? = null,
     ): Project? {
-        val open = ProjectManager.getInstance().openProjects
+        val open =
+            try {
+                ProjectManager.getInstance().openProjects
+            } catch (_: Throwable) {
+                return null
+            }
         if (projectPath != null) {
             open.find { it.basePath == projectPath }?.let { return it }
             // also try by canonical file
