@@ -13,6 +13,8 @@ plugins {
 group = "com.florexlabs"
 version = providers.gradleProperty("pluginVersion").get()
 
+val mcpEnabled = findProperty("mcpTest") == "true"
+
 repositories {
     mavenCentral()
     intellijPlatform {
@@ -25,7 +27,7 @@ dependencies {
     intellijPlatform {
         rubymine("2026.1")
         bundledPlugin("org.jetbrains.plugins.ruby")
-        bundledPlugin("com.intellij.mcpServer")
+        if (mcpEnabled) bundledPlugin("com.intellij.mcpServer")
         testFramework(TestFrameworkType.Platform)
     }
 
@@ -37,6 +39,12 @@ dependencies {
 }
 
 sourceSets {
+    if (mcpEnabled) {
+        named("main") {
+            kotlin.srcDir("src/mcp/kotlin")
+            resources.srcDir("src/mcp/resources")
+        }
+    }
     test {
         kotlin {
             exclude("**/mcp/**")
