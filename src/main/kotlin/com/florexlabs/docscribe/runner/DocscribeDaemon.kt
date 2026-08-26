@@ -560,10 +560,27 @@ class DocscribeDaemon(
      * Caches the result in [docscribeStatus] so the check runs only once per session.
      * Shows a user-friendly notification (with "Open Gemfile" action) on first failure.
      */
+    @Volatile
+    private var lastGemfileLockMtime: Long = -1
+
+    private fun currentGemfileLockMtime(): Long {
+        val gemRoot = DocscribeRunner.findProjectRoot(project.basePath ?: "") ?: return -1
+        val lock = File(gemRoot, "Gemfile.lock")
+        return try { if (lock.isFile) lock.lastModified() else -1 } catch (_: Exception) { -1 }
+    }
+
     @VisibleForTesting
     internal fun performGemCheck() {
+        val curMtime = currentGemfileLockMtime()
+        if (docscribeStatus != DocscribeStatus.UNCHECKED && curMtime == lastGemfileLockMtime) return
+        // Gemfile.lock changed or first check — re-run
+        if (curMtime != lastGemfileLockMtime) {
+            docscribeStatus = DocscribeStatus.UNCHECKED
+            capabilities = null
+        }
         if (docscribeStatus != DocscribeStatus.UNCHECKED) return
         docscribeStatus = DocscribeStatus.MISSING // pessimistic default
+        lastGemfileLockMtime = curMtime
 
         val gemRoot = DocscribeRunner.findProjectRoot(project.basePath ?: "")
         if (gemRoot == null) {
