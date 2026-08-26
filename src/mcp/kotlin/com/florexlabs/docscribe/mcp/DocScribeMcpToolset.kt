@@ -23,18 +23,25 @@ import kotlinx.serialization.Serializable
     "ktlint:standard:function-naming",
 )
 class DocScribeMcpToolset : McpToolset {
-    override fun isEnabled(): Boolean {
-        // Only enable when at least one open project looks like a DocScribe project (has Gemfile with docscribe)
-        // This prevents the toolset from being instantiated in unrelated projects and in tests without a project
-        return try {
-            com.intellij.openapi.project.ProjectManager.getInstance().openProjects.any { p ->
-                val base = p.basePath ?: return@any false
-                val gemfile = java.io.File(base, "Gemfile")
-                gemfile.isFile && gemfile.readText().contains("docscribe")
-            }
-        } catch (_: Throwable) {
-            false
+    companion object {
+        init {
+            try {
+                com.intellij.openapi.diagnostic.Logger.getInstance(DocScribeMcpToolset::class.java).info("DocScribeMcpToolset companion loaded")
+            } catch (_: Throwable) {}
         }
+    }
+
+    init {
+        try {
+            com.intellij.openapi.diagnostic.Logger.getInstance(DocScribeMcpToolset::class.java).info("DocScribeMcpToolset instantiated, isEnabled=true")
+        } catch (_: Throwable) {}
+    }
+
+    override fun isEnabled(): Boolean {
+        try {
+            com.intellij.openapi.diagnostic.Logger.getInstance(DocScribeMcpToolset::class.java).info("DocScribeMcpToolset isEnabled called")
+        } catch (_: Throwable) {}
+        return true
     }
 
     @Serializable
