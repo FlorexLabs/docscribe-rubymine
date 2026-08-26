@@ -3,7 +3,6 @@ import org.jetbrains.intellij.platform.gradle.TestFrameworkType
 plugins {
     id("java")
     id("org.jetbrains.kotlin.jvm") version "2.3.0"
-    id("org.jetbrains.kotlin.plugin.serialization") version "2.3.0"
     id("org.jetbrains.intellij.platform") version "2.16.0"
     id("com.diffplug.spotless") version "8.6.0"
     id("dev.detekt") version "2.0.0-alpha.4"
@@ -25,11 +24,9 @@ dependencies {
     intellijPlatform {
         rubymine("2026.1")
         bundledPlugin("org.jetbrains.plugins.ruby")
-        bundledPlugin("com.intellij.mcpServer")
         testFramework(TestFrameworkType.Platform)
     }
 
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.1")
     testImplementation("junit:junit:4.13.2")
 }
 
@@ -46,13 +43,15 @@ intellijPlatform {
 
         changeNotes =
             """
-            <p>DocScribe 0.1.7: RBS-aware inspections, Doctor RBS status, MCP API and i18n.</p>
+            <p>DocScribe 0.1.6: batched workspace checking, RubyMine 2026.1 – 2026.2 support.</p>
             <ul>
-                <li>RBS-aware check / safe fix / aggressive fix / workspace batch via auto-detect <code>sig/*.rbs</code> or <code>rbs</code> gem</li>
-                <li>Doctor shows <code>sig/</code>, <code>rbs</code> gem and <code>rbs.enabled</code></li>
-                <li>Annotator cache invalidates on RBS changes</li>
-                <li>Update Types via daemon with CLI fallback for old gems</li>
-                <li>MCP toolset for API testing (6 tools) and English/Russian localizations</li>
+                <li>Workspace check now sends all Ruby files to the daemon in a single batch RPC call</li>
+                <li>Workspace check shows progress and can be cancelled</li>
+                <li>Requires docscribe gem &gt;= 1.5.2 for batch mode (falls back to CLI otherwise)</li>
+                <li>Supports RubyMine 2026.1 and 2026.2</li>
+                <li>Auto-generate YARD documentation for Ruby methods</li>
+                <li>Check file / workspace diagnostics</li>
+                <li>Safe and aggressive fix actions</li>
             </ul>
             """.trimIndent()
     }
