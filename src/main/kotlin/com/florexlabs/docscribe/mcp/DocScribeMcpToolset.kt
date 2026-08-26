@@ -93,11 +93,13 @@ class DocScribeMcpToolset : McpToolset {
     ): String = projectPath ?: project.basePath ?: ""
 
     @McpTool
-    @McpDescription("Run docscribe check on a Ruby file and return diagnostics (YARD mismatches, missing docs). Use for testing Check Current File.")
+    @McpDescription(
+        "Run docscribe check on a Ruby file and return diagnostics (YARD mismatches, missing docs). Use for testing Check Current File.",
+    )
     suspend fun docscribe_check_file(
-        @McpDescription("Absolute path to Ruby file (e.g. /Users/pearl/projects/hello-world-enterprise/lib/factories/string_factory.rb)")
+        @McpDescription("Absolute path to Ruby file")
         filePath: String,
-        @McpDescription("Absolute project root (e.g. /Users/pearl/projects/hello-world-enterprise). If null, uses first open project.")
+        @McpDescription("Absolute project root. If null, uses first open project.")
         projectPath: String? = null,
     ): CheckResult {
         val project =

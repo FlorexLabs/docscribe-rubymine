@@ -1,5 +1,5 @@
-<!--suppress PluginXmlValidity -->
-<idea-plugin>
+<!--suppress ALL, PluginXmlValidity, XmlInvalidId -->
+<idea-plugin sinceBuild="262">
   <extensions defaultExtensionNs="com.intellij">
     <mcpServer.mcpToolset implementation="com.florexlabs.docscribe.mcp.DocScribeMcpToolset"/>
   </extensions>
