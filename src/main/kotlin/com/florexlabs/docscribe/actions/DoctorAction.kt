@@ -50,6 +50,11 @@ class DoctorAction : AnAction() {
      */
     private fun buildReport(project: Project): String {
         val daemon = DocscribeDaemon.getInstance(project)
+        // Ensure version is fresh if Gemfile.lock changed
+        try {
+            daemon.performGemCheck()
+        } catch (_: Exception) {
+        }
         val basePath = project.basePath ?: "?"
         val gemRoot = DocscribeRunner.findProjectRoot(basePath)
         val rubyPath = daemon.getRubyPath()
