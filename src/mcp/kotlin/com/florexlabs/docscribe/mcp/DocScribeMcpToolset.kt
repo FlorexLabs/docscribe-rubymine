@@ -26,21 +26,32 @@ class DocScribeMcpToolset : McpToolset {
     companion object {
         init {
             try {
-                com.intellij.openapi.diagnostic.Logger.getInstance(DocScribeMcpToolset::class.java).info("DocScribeMcpToolset companion loaded")
-            } catch (_: Throwable) {}
+                com.intellij.openapi.diagnostic.Logger
+                    .getInstance(
+                        DocScribeMcpToolset::class.java,
+                    ).info("DocScribeMcpToolset companion loaded")
+            } catch (_: Throwable) {
+            }
         }
     }
 
     init {
         try {
-            com.intellij.openapi.diagnostic.Logger.getInstance(DocScribeMcpToolset::class.java).info("DocScribeMcpToolset instantiated, isEnabled=true")
-        } catch (_: Throwable) {}
+            com.intellij.openapi.diagnostic.Logger
+                .getInstance(
+                    DocScribeMcpToolset::class.java,
+                ).info("DocScribeMcpToolset instantiated, isEnabled=true")
+        } catch (_: Throwable) {
+        }
     }
 
     override fun isEnabled(): Boolean {
         try {
-            com.intellij.openapi.diagnostic.Logger.getInstance(DocScribeMcpToolset::class.java).info("DocScribeMcpToolset isEnabled called")
-        } catch (_: Throwable) {}
+            com.intellij.openapi.diagnostic.Logger
+                .getInstance(DocScribeMcpToolset::class.java)
+                .info("DocScribeMcpToolset isEnabled called")
+        } catch (_: Throwable) {
+        }
         return true
     }
 
