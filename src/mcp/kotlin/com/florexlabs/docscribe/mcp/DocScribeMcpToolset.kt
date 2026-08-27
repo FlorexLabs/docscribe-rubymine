@@ -3,6 +3,8 @@ package com.florexlabs.docscribe.mcp
 import com.florexlabs.docscribe.runner.DocscribeDaemon
 import com.florexlabs.docscribe.runner.DocscribeRunner
 import com.intellij.mcpserver.McpToolset
+import com.intellij.mcpserver.annotations.McpDescription
+import com.intellij.mcpserver.annotations.McpTool
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.project.ProjectManager
 import kotlinx.serialization.Serializable
@@ -108,6 +110,8 @@ class DocScribeMcpToolset : McpToolset {
         projectPath: String?,
     ): String = projectPath ?: project.basePath ?: ""
 
+    @McpTool
+    @McpDescription("Check a single Ruby file for missing YARD documentation (runs docscribe check)")
     suspend fun docscribe_check_file(
         filePath: String,
         projectPath: String? = null,
@@ -121,6 +125,8 @@ class DocScribeMcpToolset : McpToolset {
         return CheckResult(pPath, filePath, run.success, run.hasIssues, run.exitCode, run.stdout, run.stderr)
     }
 
+    @McpTool
+    @McpDescription("Check all Ruby files in workspace for missing YARD documentation (runs docscribe check on project)")
     suspend fun docscribe_check_workspace(projectPath: String? = null): CheckResult {
         val project =
             findProject(projectPath)
@@ -149,6 +155,8 @@ class DocScribeMcpToolset : McpToolset {
         }
     }
 
+    @McpTool
+    @McpDescription("Apply safe YARD fixes to a Ruby file (adds only missing tags)")
     suspend fun docscribe_safe_fix(
         filePath: String,
         projectPath: String? = null,
@@ -171,6 +179,8 @@ class DocScribeMcpToolset : McpToolset {
         return FixResult(pPath, filePath, run.success, run.exitCode, run.stdout, run.stderr)
     }
 
+    @McpTool
+    @McpDescription("Apply aggressive YARD fixes to a Ruby file (adds and updates documentation)")
     suspend fun docscribe_aggressive_fix(
         filePath: String,
         projectPath: String? = null,
@@ -192,6 +202,8 @@ class DocScribeMcpToolset : McpToolset {
         return FixResult(pPath, filePath, run.success, run.exitCode, run.stdout, run.stderr)
     }
 
+    @McpTool
+    @McpDescription("Update YARD types from RBS signatures (runs docscribe update_types)")
     suspend fun docscribe_update_types(projectPath: String? = null): FixResult {
         val project =
             findProject(projectPath)
@@ -202,6 +214,8 @@ class DocScribeMcpToolset : McpToolset {
         return FixResult(pPath, null, run.success, run.exitCode, run.stdout, run.stderr)
     }
 
+    @McpTool
+    @McpDescription("Diagnose DocScribe setup (Ruby SDK, gem, daemon, RBS status)")
     suspend fun docscribe_doctor(projectPath: String? = null): DoctorResult {
         val project =
             findProject(projectPath)
