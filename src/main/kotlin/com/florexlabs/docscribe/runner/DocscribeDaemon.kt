@@ -1110,8 +1110,10 @@ class DocscribeDaemon(
         /**
          * Convert a list of server changes into offense maps.
          *
-         * Each change is mapped to an offense with severity `convention`, cop name
-         * `DocScribe/MissingDocumentation`, and the change's line number (default 1).
+         * Each change is mapped to an offense. For RBS type updates (`:updated_param`,
+         * `:updated_return`) the cop name is `Docscribe/UpdatedParam` / `UpdatedReturn`
+         * with `warning` severity and the original message; otherwise it is
+         * `DocScribe/MissingDocumentation` with `convention`.
          * Non-map elements are skipped.
          *
          * @param changes The list of changes from the server response.
@@ -1121,10 +1123,18 @@ class DocscribeDaemon(
             changes.mapNotNull { change ->
                 if (change is Map<*, *>) {
                     val line = (change["line"] as? Number)?.toInt() ?: 1
+                    val type = change["type"]?.toString() ?: ""
+                    val rawMessage = change["message"]?.toString()
+                    val (copName, severity, message) =
+                        when (type) {
+                            "updated_param" -> Triple("Docscribe/UpdatedParam", "warning", rawMessage ?: "updated @param type from RBS")
+                            "updated_return" -> Triple("Docscribe/UpdatedReturn", "warning", rawMessage ?: "updated @return type from RBS")
+                            else -> Triple("DocScribe/MissingDocumentation", "convention", rawMessage ?: "Missing YARD documentation")
+                        }
                     mapOf(
-                        "severity" to "convention",
-                        "cop_name" to "DocScribe/MissingDocumentation",
-                        "message" to "Missing YARD documentation",
+                        "severity" to severity,
+                        "cop_name" to copName,
+                        "message" to message,
                         "corrected" to false,
                         "correctable" to true,
                         "location" to
