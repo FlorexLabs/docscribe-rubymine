@@ -42,7 +42,8 @@ class DocscribeAnnotatorCacheSettingsTest : BasePlatformTestCase() {
         val info = DocscribeAnnotator().collectInformation(file)
         assertNotNull("should collect info for .rb file", info)
         val projectDir = file.project.basePath ?: ""
-        val expectedHash = Objects.hash(DocscribeSettings.getInstance().hideCommentsByDefault, RbsDetector.rbsHash(projectDir))
+        // collectInformation now uses projectDir.hashCode() on EDT for speed; rbsHash is computed in doAnnotate
+        val expectedHash = Objects.hash(DocscribeSettings.getInstance().hideCommentsByDefault, projectDir.hashCode())
         assertEquals("configHash should match settings hash", expectedHash, info!!.configHash)
     }
 }

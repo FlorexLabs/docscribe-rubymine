@@ -211,6 +211,11 @@ class DocScribeMcpToolset : McpToolset {
         val pPath = resolveProjectPath(project, projectPath)
         val daemon = project.getService(DocscribeDaemon::class.java)
         val run = daemon.execute("update_types", file = null, projectDir = pPath, formatJson = false)
+        try {
+            val vFile = com.intellij.openapi.vfs.LocalFileSystem.getInstance().findFileByPath(pPath)
+            vFile?.refresh(true, true)
+        } catch (_: Exception) {
+        }
         return FixResult(pPath, null, run.success, run.exitCode, run.stdout, run.stderr)
     }
 

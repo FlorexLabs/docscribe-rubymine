@@ -11,7 +11,11 @@ import java.util.concurrent.ConcurrentHashMap
  * Keyed by (projectPath, filePath, configHash) and validated by file modification stamp.
  * Prevents re-running docscribe on unchanged files between saves.
  *
- * Maximum cache size: [MAX_CACHE_SIZE]. When exceeded, the oldest entries are evicted.
+ * Uses Pseudo-LRU eviction (binary tree approximation) to keep recently edited files hot
+ * while evicting cold entries with O(log n) overhead instead of true LRU's O(n).
+ * See https://en.wikipedia.org/wiki/Pseudo-LRU
+ *
+ * Maximum cache size: [MAX_CACHE_SIZE]. When exceeded, the Pseudo-LRU victim is evicted.
  */
 @Service
 class DocscribeAnnotatorCache {
@@ -26,11 +30,15 @@ class DocscribeAnnotatorCache {
         val result: DocscribeOutput?,
     )
 
+    // Pseudo-LRU tree: bit 0 = left subtree MRU, 1 = right MRU; leaf count = next power of two >= MAX_CACHE_SIZE
+    private val treeBits = java.util.BitSet(2048)
+    private var treeSize = 1
     private val cache = ConcurrentHashMap<Key, Entry>()
     private val insertionOrder = mutableListOf<Key>()
 
     /**
      * Returns cached result if the file has not been modified since it was cached.
+     * Updates Pseudo-LRU tree on hit to mark as recently used.
      */
     @Synchronized
     fun get(
@@ -41,11 +49,13 @@ class DocscribeAnnotatorCache {
     ): DocscribeOutput? {
         val key = Key(projectPath, filePath, configHash)
         val entry = cache[key] ?: return null
-        return if (entry.fileStamp == fileStamp) entry.result else null
+        if (entry.fileStamp != fileStamp) return null
+        touchPseudoLru(key)
+        return entry.result
     }
 
     /**
-     * Stores a result in the cache. Evicts oldest entries if cache exceeds [MAX_CACHE_SIZE].
+     * Stores a result in the cache. Evicts via Pseudo-LRU if cache exceeds [MAX_CACHE_SIZE].
      */
     @Synchronized
     fun put(
@@ -57,9 +67,16 @@ class DocscribeAnnotatorCache {
     ) {
         evictIfNeeded()
         val key = Key(projectPath, filePath, configHash)
-        if (cache.put(key, Entry(fileStamp, result)) == null) {
+        val isNew = cache.put(key, Entry(fileStamp, result)) == null
+        if (isNew) {
             insertionOrder.add(key)
+            // Initialize tree size to next power of two
+            if (treeSize < insertionOrder.size) {
+                treeSize = Integer.highestOneBit(insertionOrder.size - 1) shl 1
+                if (treeSize < 2) treeSize = 2
+            }
         }
+        touchPseudoLru(key)
     }
 
     /**
@@ -83,15 +100,47 @@ class DocscribeAnnotatorCache {
      */
     fun size(): Int = cache.size
 
+    private fun touchPseudoLru(key: Key) {
+        val idx = insertionOrder.indexOf(key)
+        if (idx == -1) return
+        // Walk tree from leaf to root, setting bits to point away from MRU leaf
+        var node = idx + treeSize
+        var bitPos = 0
+        while (node > 1) {
+            val parent = node / 2
+            val isRight = node % 2 == 1
+            // Bit 0 = left MRU, 1 = right MRU — set to opposite of current leaf direction
+            if (isRight) treeBits.clear(parent) else treeBits.set(parent)
+            node = parent
+            bitPos++
+            if (bitPos > 20) break // safety
+        }
+    }
+
+    private fun findPseudoLruVictim(): Key? {
+        if (insertionOrder.isEmpty()) return null
+        var node = 1
+        while (node < treeSize) {
+            val bit = treeBits.get(node)
+            // Follow the LRU direction (opposite of MRU bit)
+            node = if (bit) node * 2 else node * 2 + 1
+            if (node >= treeSize + insertionOrder.size) break
+        }
+        val leafIdx = (node - treeSize).coerceIn(0, insertionOrder.size - 1)
+        return insertionOrder.getOrNull(leafIdx)
+    }
+
     /**
-     * If the cache has exceeded [MAX_CACHE_SIZE], removes the oldest quarter of entries.
+     * If the cache has exceeded [MAX_CACHE_SIZE], removes via Pseudo-LRU victim.
      */
     private fun evictIfNeeded() {
         while (cache.size >= MAX_CACHE_SIZE) {
-            val evictCount = (MAX_CACHE_SIZE / 4).coerceAtLeast(1)
-            val toEvict = insertionOrder.take(evictCount)
-            insertionOrder.removeAll(toEvict)
-            toEvict.forEach { cache.remove(it) }
+            val victim = findPseudoLruVictim() ?: insertionOrder.firstOrNull() ?: break
+            cache.remove(victim)
+            insertionOrder.remove(victim)
+            // Clear tree bits for victim leaf
+            val idx = insertionOrder.indexOf(victim)
+            if (idx != -1) treeBits.clear(idx + treeSize)
         }
     }
 

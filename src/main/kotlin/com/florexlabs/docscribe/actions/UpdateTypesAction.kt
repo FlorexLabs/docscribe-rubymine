@@ -47,6 +47,12 @@ class UpdateTypesAction : AnAction() {
                     )
                 val result = DocscribeDaemon.executeWithFallback(project, options)
                 exitCode = result.exitCode
+                // Refresh VFS so the editor shows the updated YARD docs
+                try {
+                    val vFile = com.intellij.openapi.vfs.LocalFileSystem.getInstance().findFileByPath(projectRoot)
+                    vFile?.refresh(true, true)
+                } catch (_: Exception) {
+                }
             }
 
             override fun onSuccess() {

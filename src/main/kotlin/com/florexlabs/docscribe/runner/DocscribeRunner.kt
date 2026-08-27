@@ -189,7 +189,8 @@ object DocscribeRunner {
         when (strategy) {
             DocscribeStrategy.SAFE -> {
                 if (useRbs) {
-                    // RBS types are only updated in aggressive mode, so safe with RBS must use aggressive flags for types
+                    // For RBS type mismatches, safe alone does nothing (needs aggressive to update types),
+                    // but we use -k to preserve manual descriptions
                     args.addAll(listOf("-A", "-k", "-B"))
                 } else {
                     args.add("-a")

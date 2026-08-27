@@ -208,7 +208,8 @@ class DocscribeDaemon(
                 log.info("check_batch not available, using CLI directory scan")
                 return fallback("check", file = null, projectDir = projectDir, formatJson = true)
             }
-            val params = buildBatchParams(files, projectDir ?: project.basePath ?: "")
+            val effectiveDir = projectDir ?: project.basePath ?: ""
+            val params = buildBatchParams(files, effectiveDir)
             val response = rpcCall(handle, "check_batch", params)
             return processBatchResponse(response, projectDir)
         }
@@ -314,9 +315,8 @@ class DocscribeDaemon(
             }
 
             "safe_fix" -> {
-                val dir = params["project_dir"] as? String ?: ""
-                val strategy = if (RbsDetector.shouldUseRbs(dir)) "aggressive" else "safe"
-                rpcCall(handle, "fix", params + mapOf("strategy" to strategy))
+                // For RBS, use safe with -k to preserve docs ( DocscribeRunner SAFE with useRbs does -a -k -B)
+                rpcCall(handle, "fix", params + mapOf("strategy" to "safe"))
             }
 
             "aggressive_fix" -> {

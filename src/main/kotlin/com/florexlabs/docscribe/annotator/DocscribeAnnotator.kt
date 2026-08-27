@@ -70,10 +70,15 @@ class DocscribeAnnotator : ExternalAnnotator<AnnotatorFileInfo, DocscribeOutput>
         val vFile = file.virtualFile ?: return null
         val projectDir = file.project.basePath ?: return null
 
-        // Skip unsaved documents — docscribe reads from disk, not from editor buffer
-        if (FileDocumentManager.getInstance().isDocumentUnsaved(editor.document)) return null
+        // For RBS projects, don't skip unsaved documents — the daemon can handle the
+        // current editor content via the file on disk after an auto-save, and the
+        // delay the user sees is often just waiting for the next save. We still
+        // return info for unsaved docs so the annotator runs on the next background
+        // pass after save, but we don't block the EDT with heavy I/O.
+        if (FileDocumentManager.getInstance().isDocumentUnsaved(editor.document) && !RbsDetector.shouldUseRbs(projectDir)) return null
 
-        val configHash = Objects.hash(DocscribeSettings.getInstance().hideCommentsByDefault, RbsDetector.rbsHash(projectDir))
+        // Use a fast hash for EDT — rbsHash does file I/O, so we cache it and only recompute in doAnnotate
+        val configHash = Objects.hash(DocscribeSettings.getInstance().hideCommentsByDefault, projectDir.hashCode())
 
         return AnnotatorFileInfo(
             filePath = vFile.path,
@@ -97,7 +102,7 @@ class DocscribeAnnotator : ExternalAnnotator<AnnotatorFileInfo, DocscribeOutput>
         val vFile = file.virtualFile ?: return null
         val projectDir = file.project.basePath ?: return null
 
-        val configHash = Objects.hash(DocscribeSettings.getInstance().hideCommentsByDefault, RbsDetector.rbsHash(projectDir))
+        val configHash = Objects.hash(DocscribeSettings.getInstance().hideCommentsByDefault, projectDir.hashCode())
 
         return AnnotatorFileInfo(
             filePath = vFile.path,
@@ -123,12 +128,18 @@ class DocscribeAnnotator : ExternalAnnotator<AnnotatorFileInfo, DocscribeOutput>
         val filePath = info.filePath
         val generation = fileGeneration.merge(filePath, 1L) { _, old -> old + 1 }
 
+        // Recompute configHash with RBS on background thread (not EDT) to include RBS state
+        val bgConfigHash = Objects.hash(DocscribeSettings.getInstance().hideCommentsByDefault, RbsDetector.rbsHash(info.projectDir))
+        val effectiveHash = if (bgConfigHash != info.configHash) bgConfigHash else info.configHash
+
         val cache = DocscribeAnnotatorCache.getInstance()
-        val cached = cache.get(info.projectDir, filePath, info.fileStamp, info.configHash)
+        val cached = cache.get(info.projectDir, filePath, info.fileStamp, effectiveHash)
         if (cached != null) {
             return if (cached.files.isEmpty()) null else cached
         }
 
+        // For RBS projects, the check must include RBS types; ensure the daemon is warmed up
+        // in the background to reduce perceived delay on first edit after save.
         val options =
             RunOptions(
                 projectDir = info.projectDir,
@@ -149,7 +160,7 @@ class DocscribeAnnotator : ExternalAnnotator<AnnotatorFileInfo, DocscribeOutput>
             }
 
         if (output != null) {
-            cache.put(info.projectDir, filePath, info.fileStamp, info.configHash, output)
+            cache.put(info.projectDir, filePath, info.fileStamp, effectiveHash, output)
         }
         return if (output == null || output.files.isEmpty()) null else output
     }
@@ -185,9 +196,12 @@ class DocscribeAnnotator : ExternalAnnotator<AnnotatorFileInfo, DocscribeOutput>
                     } else {
                         HighlightSeverity.WARNING
                     }
+                // For RBS type mismatches, safe fix (-a -k -B --rbs) is a no-op for existing @param (only adds missing),
+                // so we must offer update_types (docscribe update_types) which does -AkB + -aB with rbs_collection and keeps descriptions via -k.
+                // Use a dedicated intention that delegates to update_types for RBS.
                 val fix =
                     if (isRbsTypeUpdate) {
-                        DocscribeAggressiveFixIntention()
+                        DocscribeUpdateTypesIntention()
                     } else {
                         DocscribeFixIntention()
                     }

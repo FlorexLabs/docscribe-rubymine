@@ -34,17 +34,27 @@ object RbsDetector {
      */
     fun hasCollection(projectDir: String): Boolean = projectDir.isNotBlank() && File(projectDir, "rbs_collection.lock.yaml").exists()
 
+    private data class CachedHash(val hash: Int, val timestamp: Long, val sigMtime: Long)
+    private val hashCache = java.util.concurrent.ConcurrentHashMap<String, CachedHash>()
+    private const val HASH_CACHE_TTL_MS = 1000L
+
     /**
      * Hash capturing RBS-relevant file states for cache invalidation.
      * Includes enabled flag, collection presence, docscribe.yml mtime and RBS files in sig.
+     * Cached for 1 second to avoid repeated file I/O on EDT during typing, with sig mtime check.
      */
     @Suppress("MagicNumber")
     fun rbsHash(projectDir: String): Int {
         if (projectDir.isBlank()) return 0
+        val now = System.currentTimeMillis()
+        val sigDir = File(projectDir, "sig")
+        val sigMtime = if (sigDir.isDirectory) sigDir.walkTopDown().filter { it.isFile && it.extension == "rbs" }.map { it.lastModified() }.maxOrNull() ?: 0 else 0
+        hashCache[projectDir]?.let { cached ->
+            if (now - cached.timestamp < HASH_CACHE_TTL_MS && sigMtime == cached.sigMtime) return cached.hash
+        }
         var hash = shouldUseRbs(projectDir).hashCode()
         hash = 31 * hash + hasCollection(projectDir).hashCode()
         findDocscribeYml(projectDir)?.let { hash = 31 * hash + it.lastModified().hashCode() }
-        val sigDir = File(projectDir, "sig")
         if (sigDir.isDirectory) {
             try {
                 sigDir
@@ -59,6 +69,7 @@ object RbsDetector {
                 // ignore walk errors
             }
         }
+        hashCache[projectDir] = CachedHash(hash, now, sigMtime)
         return hash
     }
 
