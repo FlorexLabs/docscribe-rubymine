@@ -105,7 +105,7 @@ class GetCommandArgsTest {
     }
 
     @Test
-    fun `safe mode with rbs adds rbs before file`() {
+    fun `safe mode with rbs uses aggressive flags for RBS types`() {
         val args =
             DocscribeRunner.getCommandArgs(
                 strategy = DocscribeStrategy.SAFE,
@@ -114,6 +114,6 @@ class GetCommandArgsTest {
                 useRbs = true,
                 useRbsCollection = false,
             )
-        assertEquals(listOf("-a", "-B", "--rbs", "foo.rb"), args)
+        assertEquals(listOf("-A", "-k", "-B", "--rbs", "foo.rb"), args)
     }
 }

@@ -183,10 +183,16 @@ class DocscribeAnnotator : ExternalAnnotator<AnnotatorFileInfo, DocscribeOutput>
                     } else {
                         HighlightSeverity.WARNING
                     }
+                val fix =
+                    if (offense.copName == "Docscribe/UpdatedParam" || offense.copName == "Docscribe/UpdatedReturn") {
+                        DocscribeAggressiveFixIntention()
+                    } else {
+                        DocscribeFixIntention()
+                    }
                 holder
                     .newAnnotation(severity, offense.message)
                     .range(range)
-                    .withFix(DocscribeFixIntention())
+                    .withFix(fix)
                     .create()
             }
         }
