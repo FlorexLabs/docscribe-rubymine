@@ -173,7 +173,9 @@ class DocscribeAnnotator : ExternalAnnotator<AnnotatorFileInfo, DocscribeOutput>
         val document = PsiDocumentManager.getInstance(file.project).getDocument(file) ?: return
         for (parsedFile in annotationResult.files) {
             for (offense in parsedFile.offenses) {
-                val line = (offense.location.startLine - 1).coerceIn(0, document.lineCount - 1)
+                val isRbsTypeUpdate = offense.copName == "Docscribe/UpdatedParam" || offense.copName == "Docscribe/UpdatedReturn"
+                val baseLine = (offense.location.startLine - 1).coerceIn(0, document.lineCount - 1)
+                val line = if (isRbsTypeUpdate) findYardTagLine(document, baseLine, offense.copName) ?: baseLine else baseLine
                 val lineStart = document.getLineStartOffset(line)
                 val lineEnd = document.getLineEndOffset(line)
                 val range = TextRange(lineStart, lineEnd)
@@ -183,13 +185,36 @@ class DocscribeAnnotator : ExternalAnnotator<AnnotatorFileInfo, DocscribeOutput>
                     } else {
                         HighlightSeverity.WARNING
                     }
+                val fix =
+                    if (isRbsTypeUpdate) {
+                        DocscribeAggressiveFixIntention()
+                    } else {
+                        DocscribeFixIntention()
+                    }
                 holder
                     .newAnnotation(severity, offense.message)
                     .range(range)
-                    .withFix(DocscribeFixIntention())
+                    .withFix(fix)
                     .create()
             }
         }
+    }
+
+    private fun findYardTagLine(
+        document: com.intellij.openapi.editor.Document,
+        defLine: Int,
+        copName: String,
+    ): Int? {
+        val tag = if (copName == "Docscribe/UpdatedParam") "@param" else "@return"
+        var line = defLine - 1
+        while (line >= 0) {
+            val text = document.getText(TextRange(document.getLineStartOffset(line), document.getLineEndOffset(line)))
+            val trimmed = text.trim()
+            if (!trimmed.startsWith("#")) break
+            if (trimmed.contains(tag)) return line
+            line--
+        }
+        return null
     }
 
     // noinspection CompanionObjectInExtension
