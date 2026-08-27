@@ -309,12 +309,31 @@ class DocscribeDaemon(
         params: Map<String, Any?>,
     ): Map<String, Any?>? =
         when (command) {
-            "check" -> rpcCall(handle, "check", params)
-            "safe_fix" -> rpcCall(handle, "fix", params + mapOf("strategy" to "safe"))
-            "aggressive_fix" -> rpcCall(handle, "fix", params + mapOf("strategy" to "aggressive"))
-            "ping" -> rpcCall(handle, "ping")
-            "update_types" -> rpcCall(handle, "update_types", params)
-            else -> null
+            "check" -> {
+                rpcCall(handle, "check", params)
+            }
+
+            "safe_fix" -> {
+                val dir = params["project_dir"] as? String ?: ""
+                val strategy = if (RbsDetector.shouldUseRbs(dir)) "aggressive" else "safe"
+                rpcCall(handle, "fix", params + mapOf("strategy" to strategy))
+            }
+
+            "aggressive_fix" -> {
+                rpcCall(handle, "fix", params + mapOf("strategy" to "aggressive"))
+            }
+
+            "ping" -> {
+                rpcCall(handle, "ping")
+            }
+
+            "update_types" -> {
+                rpcCall(handle, "update_types", params)
+            }
+
+            else -> {
+                null
+            }
         }
 
     /**

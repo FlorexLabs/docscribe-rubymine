@@ -188,8 +188,13 @@ object DocscribeRunner {
         val args = mutableListOf<String>()
         when (strategy) {
             DocscribeStrategy.SAFE -> {
-                args.add("-a")
-                args.add("-B")
+                if (useRbs) {
+                    // RBS types are only updated in aggressive mode, so safe with RBS must use aggressive flags for types
+                    args.addAll(listOf("-A", "-k", "-B"))
+                } else {
+                    args.add("-a")
+                    args.add("-B")
+                }
             }
 
             DocscribeStrategy.AGGRESSIVE -> {
