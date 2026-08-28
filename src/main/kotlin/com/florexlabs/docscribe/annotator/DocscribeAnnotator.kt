@@ -82,7 +82,8 @@ class DocscribeAnnotator : ExternalAnnotator<AnnotatorFileInfo, DocscribeOutput>
         if (FileDocumentManager.getInstance().isDocumentUnsaved(editor.document) && !RbsDetector.shouldUseRbs(projectDir)) return null
 
         // Use a fast hash for EDT — rbsHash does file I/O, so we cache it and only recompute in doAnnotate
-        val configHash = Objects.hash(DocscribeSettings.getInstance().hideCommentsByDefault, projectDir.hashCode())
+        val settings = DocscribeSettings.getInstance()
+        val configHash = Objects.hash(settings.hideCommentsByDefault, settings.warnOnInvalidYardTypes, projectDir.hashCode())
         // Use PsiFile stamp + document stamp for reliable change detection (VirtualFile stamp can be 0 for non-indexed files)
         val fileStamp = file.modificationStamp
 
@@ -108,7 +109,8 @@ class DocscribeAnnotator : ExternalAnnotator<AnnotatorFileInfo, DocscribeOutput>
         val vFile = file.virtualFile ?: return null
         val projectDir = file.project.basePath ?: return null
 
-        val configHash = Objects.hash(DocscribeSettings.getInstance().hideCommentsByDefault, projectDir.hashCode())
+        val settings = DocscribeSettings.getInstance()
+        val configHash = Objects.hash(settings.hideCommentsByDefault, settings.warnOnInvalidYardTypes, projectDir.hashCode())
         val fileStamp = file.modificationStamp
 
         return AnnotatorFileInfo(
@@ -138,7 +140,13 @@ class DocscribeAnnotator : ExternalAnnotator<AnnotatorFileInfo, DocscribeOutput>
         val generation = fileGeneration.merge(filePath, 1L) { _, old -> old + 1 }
 
         // Recompute configHash with RBS on background thread (not EDT) to include RBS state
-        val bgConfigHash = Objects.hash(DocscribeSettings.getInstance().hideCommentsByDefault, RbsDetector.rbsHash(info.projectDir))
+        val settings = DocscribeSettings.getInstance()
+        val bgConfigHash =
+            Objects.hash(
+                settings.hideCommentsByDefault,
+                settings.warnOnInvalidYardTypes,
+                RbsDetector.rbsHash(info.projectDir),
+            )
         val effectiveHash = if (bgConfigHash != info.configHash) bgConfigHash else info.configHash
         log.info("DocScribe doAnnotate hashes infoHash=${info.configHash} bgHash=$bgConfigHash effective=$effectiveHash")
 
@@ -227,6 +235,7 @@ class DocscribeAnnotator : ExternalAnnotator<AnnotatorFileInfo, DocscribeOutput>
      * @param annotationResult The parsed docscribe output, or `null`.
      * @param holder           The annotation holder to add annotations to.
      */
+    @Suppress("CyclomaticComplexMethod", "LongMethod", "NestedBlockDepth")
     override fun apply(
         file: PsiFile,
         annotationResult: DocscribeOutput?,
@@ -235,38 +244,49 @@ class DocscribeAnnotator : ExternalAnnotator<AnnotatorFileInfo, DocscribeOutput>
         val filePath = file.virtualFile?.path
         val offenseCount = annotationResult?.files?.sumOf { it.offenses.size }
         log.info("DocScribe apply file=$filePath result=${annotationResult?.files?.size} offenses=$offenseCount")
-        if (annotationResult == null) return
         val document = PsiDocumentManager.getInstance(file.project).getDocument(file) ?: return
-        for (parsedFile in annotationResult.files) {
-            for (offense in parsedFile.offenses) {
-                val isRbsTypeUpdate = offense.copName == "Docscribe/UpdatedParam" || offense.copName == "Docscribe/UpdatedReturn"
-                val baseLine = (offense.location.startLine - 1).coerceIn(0, document.lineCount - 1)
-                val line = if (isRbsTypeUpdate) findYardTagLine(document, baseLine, offense.copName) ?: baseLine else baseLine
-                val lineStart = document.getLineStartOffset(line)
-                val lineEnd = document.getLineEndOffset(line)
-                val range = TextRange(lineStart, lineEnd)
-                val severity =
-                    if (offense.severity == "fatal") {
-                        HighlightSeverity.ERROR
-                    } else {
-                        HighlightSeverity.WARNING
-                    }
-                // For RBS type mismatches, safe fix is no-op for existing @param,
-                // so offer update_types which does -AkB + -aB with rbs_collection.
-                // Keeps descriptions via -k.
-                val fix =
-                    if (isRbsTypeUpdate) {
-                        DocscribeUpdateTypesIntention()
-                    } else {
-                        DocscribeFixIntention()
-                    }
-                holder
-                    .newAnnotation(severity, offense.message)
-                    .range(range)
-                    .withFix(fix)
-                    .create()
+        // 1. Daemon offenses (RBS mismatches, missing docs, invalid YARD)
+        if (annotationResult != null) {
+            for (parsedFile in annotationResult.files) {
+                for (offense in parsedFile.offenses) {
+                    val isRbsTypeUpdate = offense.copName == "Docscribe/UpdatedParam" || offense.copName == "Docscribe/UpdatedReturn"
+                    val isInvalidYard = offense.copName == "Docscribe/InvalidType"
+                    val baseLine = (offense.location.startLine - 1).coerceIn(0, document.lineCount - 1)
+                    // For both RBS updates and invalid YARD, highlight the YARD comment, not the def
+                    val line =
+                        when {
+                            isRbsTypeUpdate -> findYardTagLine(document, baseLine, offense.copName) ?: baseLine
+                            isInvalidYard -> findYardTagLine(document, baseLine, offense.copName, offense.message) ?: baseLine
+                            else -> baseLine
+                        }
+                    val lineStart = document.getLineStartOffset(line)
+                    val lineEnd = document.getLineEndOffset(line)
+                    val range = TextRange(lineStart, lineEnd)
+                    val severity =
+                        if (offense.severity == "fatal") {
+                            HighlightSeverity.ERROR
+                        } else {
+                            HighlightSeverity.WARNING
+                        }
+                    // For RBS type mismatches, safe fix is no-op for existing @param,
+                    // so offer update_types which does -AkB + -aB with rbs_collection.
+                    // Keeps descriptions via -k. For invalid YARD, offer direct YARD fix.
+                    val fix =
+                        when {
+                            isRbsTypeUpdate -> DocscribeUpdateTypesIntention()
+                            isInvalidYard -> DocscribeInvalidYardTypeFixIntention(offense.message, line)
+                            else -> DocscribeFixIntention()
+                        }
+                    holder
+                        .newAnnotation(severity, offense.message)
+                        .range(range)
+                        .withFix(fix)
+                        .create()
+                }
             }
         }
+        // YARD syntax validation without RBS is now handled by the gem via --validate-types
+        // (Yard::Validator + TypeMismatchValidator) and appears as Docscribe/InvalidType above
     }
 
     private fun findYardTagLine(
@@ -274,14 +294,46 @@ class DocscribeAnnotator : ExternalAnnotator<AnnotatorFileInfo, DocscribeOutput>
         defLine: Int,
         copName: String,
     ): Int? {
-        val tag = if (copName == "Docscribe/UpdatedParam") "@param" else "@return"
+        // For InvalidType, try to find the specific @param line if message contains "for @param"
+        // otherwise fall back to generic @param/@return search
+        return findYardTagLine(document, defLine, copName, null)
+    }
+
+    @Suppress("CyclomaticComplexMethod", "ReturnCount")
+    private fun findYardTagLine(
+        document: com.intellij.openapi.editor.Document,
+        defLine: Int,
+        copName: String,
+        message: String?,
+    ): Int? {
+        // Try to extract param name from message like "for @param args"
+        val paramName = message?.let { Regex("""for @param (\w+)""").find(it)?.groupValues?.getOrNull(1) }
         var line = defLine - 1
         while (line >= 0) {
             val text = document.getText(TextRange(document.getLineStartOffset(line), document.getLineEndOffset(line)))
             val trimmed = text.trim()
             if (!trimmed.startsWith("#")) break
-            if (trimmed.contains(tag)) return line
+            if (paramName != null) {
+                if (trimmed.contains("@param") && trimmed.contains(paramName)) return line
+            } else {
+                val tag = if (copName == "Docscribe/UpdatedParam") "@param" else "@return"
+                if (trimmed.contains(tag)) return line
+            }
             line--
+        }
+        // Fallback: search for line containing the invalid type text if paramName not found
+        // paramName != null implies message != null (derived via message?.let), so !! is safe
+        if (paramName != null) {
+            val invalidType = Regex("""\[([^]]+)] for @param""").find(message)?.groupValues?.getOrNull(1)
+            if (invalidType != null) {
+                line = defLine - 1
+                while (line >= 0) {
+                    val text = document.getText(TextRange(document.getLineStartOffset(line), document.getLineEndOffset(line)))
+                    if (text.contains("[$invalidType]")) return line
+                    if (!text.trim().startsWith("#")) break
+                    line--
+                }
+            }
         }
         return null
     }

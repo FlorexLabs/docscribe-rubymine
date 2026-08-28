@@ -116,4 +116,32 @@ class GetCommandArgsTest {
             )
         assertEquals(listOf("-A", "-k", "-B", "--rbs", "foo.rb"), args)
     }
+
+    @Test
+    fun `check mode with validate_types adds flag`() {
+        val args =
+            DocscribeRunner.getCommandArgs(
+                strategy = DocscribeStrategy.CHECK,
+                formatJson = true,
+                filePath = "a.rb",
+                useRbs = false,
+                useRbsCollection = false,
+                validateTypes = true,
+            )
+        assertEquals(listOf("--validate-types", "--format", "json", "a.rb"), args)
+    }
+
+    @Test
+    fun `check mode with rbs and validate_types adds both`() {
+        val args =
+            DocscribeRunner.getCommandArgs(
+                strategy = DocscribeStrategy.CHECK,
+                formatJson = false,
+                filePath = null,
+                useRbs = true,
+                useRbsCollection = false,
+                validateTypes = true,
+            )
+        assertEquals(listOf("--rbs", "--validate-types"), args)
+    }
 }
