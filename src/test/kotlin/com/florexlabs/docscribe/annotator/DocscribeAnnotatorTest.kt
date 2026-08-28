@@ -74,4 +74,22 @@ class DocscribeAnnotatorTest : BasePlatformTestCase() {
         assertEquals(2L, DocscribeAnnotator.fileGeneration.getOrDefault(info1.filePath, 0L))
         assertEquals(1L, DocscribeAnnotator.fileGeneration.getOrDefault(info2.filePath, 0L))
     }
+
+    fun testCollectInformationIncludesWarnOnInvalidYardTypesInHash() {
+        val settings =
+            com.florexlabs.docscribe.settings.DocscribeSettings
+                .getInstance()
+        val saved = settings.warnOnInvalidYardTypes
+        try {
+            settings.warnOnInvalidYardTypes = false
+            val file = myFixture.configureByText("test.rb", "class Foo\nend")
+            val infoFalse = DocscribeAnnotator().collectInformation(file)!!
+            settings.warnOnInvalidYardTypes = true
+            val infoTrue = DocscribeAnnotator().collectInformation(myFixture.configureByText("test2.rb", "class Foo\nend"))!!
+            // Hash should differ when setting changes (different file to avoid same path)
+            assertTrue(infoFalse.configHash != infoTrue.configHash)
+        } finally {
+            settings.warnOnInvalidYardTypes = saved
+        }
+    }
 }
