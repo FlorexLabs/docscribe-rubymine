@@ -66,7 +66,9 @@ class UpdateTypesAction : AnAction() {
                 // Also reload open documents
                 try {
                     val mgr = FileDocumentManager.getInstance()
-                    for (file in com.intellij.openapi.fileEditor.FileEditorManager.getInstance(project).openFiles) {
+                    for (file in com.intellij.openapi.fileEditor.FileEditorManager
+                        .getInstance(project)
+                        .openFiles) {
                         mgr.reloadFiles(file)
                     }
                 } catch (_: Exception) {
