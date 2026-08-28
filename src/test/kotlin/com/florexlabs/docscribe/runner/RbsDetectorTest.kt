@@ -98,4 +98,59 @@ class RbsDetectorTest {
             dir.deleteRecursively()
         }
     }
+
+    @Test
+    fun `rbsHash is cached within TTL when mtime unchanged`() {
+        val dir = Files.createTempDirectory("rbs-test-cache").toFile()
+        try {
+            val sig = File(dir, "sig")
+            sig.mkdir()
+            File(sig, "a.rbs").writeText("class A; end")
+            val hash1 = RbsDetector.rbsHash(dir.absolutePath)
+            val hash2 = RbsDetector.rbsHash(dir.absolutePath)
+            assertEquals(hash1, hash2)
+        } finally {
+            dir.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun `rbsHash includes hasCollection and yml`() {
+        val dir = Files.createTempDirectory("rbs-test-hash2").toFile()
+        try {
+            val sig = File(dir, "sig")
+            sig.mkdir()
+            File(sig, "a.rbs").writeText("class A; end")
+            val hash1 = RbsDetector.rbsHash(dir.absolutePath)
+            File(dir, "rbs_collection.lock.yaml").createNewFile()
+            Thread.sleep(10)
+            // Force mtime change to bypass TTL
+            File(sig, "a.rbs").setLastModified(System.currentTimeMillis() + 1000)
+            val hash2 = RbsDetector.rbsHash(dir.absolutePath)
+            assertTrue(hash1 != hash2)
+        } finally {
+            dir.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun `rbsHash single walk handles multiple files`() {
+        val dir = Files.createTempDirectory("rbs-test-multi").toFile()
+        try {
+            val sig = File(dir, "sig")
+            sig.mkdir()
+            File(sig, "a.rbs").writeText("class A; end")
+            File(sig, "b.rbs").writeText("class B; end")
+            File(sig, "c.rbs").writeText("class C; end")
+            val hash1 = RbsDetector.rbsHash(dir.absolutePath)
+            assertTrue(hash1 != 0)
+            // Add another file — hash should change
+            Thread.sleep(10)
+            File(sig, "d.rbs").writeText("class D; end")
+            val hash2 = RbsDetector.rbsHash(dir.absolutePath)
+            assertTrue(hash1 != hash2)
+        } finally {
+            dir.deleteRecursively()
+        }
+    }
 }

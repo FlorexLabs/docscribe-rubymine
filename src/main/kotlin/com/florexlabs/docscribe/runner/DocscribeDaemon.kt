@@ -165,17 +165,15 @@ class DocscribeDaemon(
         projectDir: String? = null,
         formatJson: Boolean = false,
     ): RunResult {
-        synchronized(lock) {
-            val handle = ensureRunning(projectDir) ?: return fallback(command, file, projectDir, formatJson)
-            val params = if (command == "update_types") buildUpdateTypesParams(projectDir) else buildExecuteParams(file, projectDir)
-            val response = performRpcCall(handle, command, params)
-            // Fallback for older daemons that don't support update_types (< 1.6.2)
-            if (command == "update_types" && isUnknownMethodError(response)) {
-                log.warn("Daemon doesn't support update_types, falling back to CLI")
-                return fallback(command, file, projectDir, formatJson)
-            }
-            return processRpcResponse(response, command, file, projectDir, formatJson)
+        val handle = synchronized(lock) { ensureRunning(projectDir) } ?: return fallback(command, file, projectDir, formatJson)
+        val params = if (command == "update_types") buildUpdateTypesParams(projectDir) else buildExecuteParams(file, projectDir)
+        val response = performRpcCall(handle, command, params)
+        // Fallback for older daemons that don't support update_types (< 1.6.2)
+        if (command == "update_types" && isUnknownMethodError(response)) {
+            log.warn("Daemon doesn't support update_types, falling back to CLI")
+            return fallback(command, file, projectDir, formatJson)
         }
+        return processRpcResponse(response, command, file, projectDir, formatJson)
     }
 
     @VisibleForTesting
@@ -202,16 +200,15 @@ class DocscribeDaemon(
         files: List<String>,
         projectDir: String? = null,
     ): RunResult {
-        synchronized(lock) {
-            val handle = ensureRunning(projectDir)
-            if (handle == null || capabilities?.batchMode != true) {
-                log.info("check_batch not available, using CLI directory scan")
-                return fallback("check", file = null, projectDir = projectDir, formatJson = true)
-            }
-            val params = buildBatchParams(files, projectDir ?: project.basePath ?: "")
-            val response = rpcCall(handle, "check_batch", params)
-            return processBatchResponse(response, projectDir)
+        val handle = synchronized(lock) { ensureRunning(projectDir) }
+        if (handle == null || capabilities?.batchMode != true) {
+            log.info("check_batch not available, using CLI directory scan")
+            return fallback("check", file = null, projectDir = projectDir, formatJson = true)
         }
+        val effectiveDir = projectDir ?: project.basePath ?: ""
+        val params = buildBatchParams(files, effectiveDir)
+        val response = rpcCall(handle, "check_batch", params)
+        return processBatchResponse(response, projectDir)
     }
 
     /**
@@ -314,9 +311,8 @@ class DocscribeDaemon(
             }
 
             "safe_fix" -> {
-                val dir = params["project_dir"] as? String ?: ""
-                val strategy = if (RbsDetector.shouldUseRbs(dir)) "aggressive" else "safe"
-                rpcCall(handle, "fix", params + mapOf("strategy" to strategy))
+                // For RBS, use safe with -k to preserve docs ( DocscribeRunner SAFE with useRbs does -a -k -B)
+                rpcCall(handle, "fix", params + mapOf("strategy" to "safe"))
             }
 
             "aggressive_fix" -> {
@@ -1110,8 +1106,10 @@ class DocscribeDaemon(
         /**
          * Convert a list of server changes into offense maps.
          *
-         * Each change is mapped to an offense with severity `convention`, cop name
-         * `DocScribe/MissingDocumentation`, and the change's line number (default 1).
+         * Each change is mapped to an offense. For RBS type updates (`:updated_param`,
+         * `:updated_return`) the cop name is `Docscribe/UpdatedParam` / `UpdatedReturn`
+         * with `warning` severity and the original message; otherwise it is
+         * `DocScribe/MissingDocumentation` with `convention`.
          * Non-map elements are skipped.
          *
          * @param changes The list of changes from the server response.
@@ -1121,10 +1119,18 @@ class DocscribeDaemon(
             changes.mapNotNull { change ->
                 if (change is Map<*, *>) {
                     val line = (change["line"] as? Number)?.toInt() ?: 1
+                    val type = change["type"]?.toString() ?: ""
+                    val rawMessage = change["message"]?.toString()
+                    val (copName, severity, message) =
+                        when (type) {
+                            "updated_param" -> Triple("Docscribe/UpdatedParam", "warning", rawMessage ?: "updated @param type from RBS")
+                            "updated_return" -> Triple("Docscribe/UpdatedReturn", "warning", rawMessage ?: "updated @return type from RBS")
+                            else -> Triple("DocScribe/MissingDocumentation", "convention", rawMessage ?: "Missing YARD documentation")
+                        }
                     mapOf(
-                        "severity" to "convention",
-                        "cop_name" to "DocScribe/MissingDocumentation",
-                        "message" to "Missing YARD documentation",
+                        "severity" to severity,
+                        "cop_name" to copName,
+                        "message" to message,
                         "corrected" to false,
                         "correctable" to true,
                         "location" to

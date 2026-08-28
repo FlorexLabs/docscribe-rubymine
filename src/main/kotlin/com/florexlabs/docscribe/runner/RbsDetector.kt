@@ -34,31 +34,54 @@ object RbsDetector {
      */
     fun hasCollection(projectDir: String): Boolean = projectDir.isNotBlank() && File(projectDir, "rbs_collection.lock.yaml").exists()
 
+    private data class CachedHash(
+        val hash: Int,
+        val timestamp: Long,
+        val sigMtime: Long,
+    )
+
+    private val hashCache = java.util.concurrent.ConcurrentHashMap<String, CachedHash>()
+    private const val HASH_CACHE_TTL_MS = 1000L
+
     /**
      * Hash capturing RBS-relevant file states for cache invalidation.
      * Includes enabled flag, collection presence, docscribe.yml mtime and RBS files in sig.
+     * Cached for 1 second to avoid repeated file I/O on EDT during typing, with sig mtime check.
+     * Optimized to single walkTopDown to avoid double I/O.
      */
-    @Suppress("MagicNumber")
+    @Suppress("MagicNumber", "NestedBlockDepth")
     fun rbsHash(projectDir: String): Int {
         if (projectDir.isBlank()) return 0
+        val now = System.currentTimeMillis()
+        val sigDir = File(projectDir, "sig")
+        // Fast check: if cache exists and cached sigMtime matches current max, return immediately
+        // We need sigMtime first, but we can avoid full hash computation on hit
+        var sigMtime = 0L
+        val rbsFiles = mutableListOf<File>()
+        if (sigDir.isDirectory) {
+            try {
+                sigDir.walkTopDown().forEach { file ->
+                    if (file.isFile && file.extension == "rbs") {
+                        rbsFiles.add(file)
+                        val lm = file.lastModified()
+                        if (lm > sigMtime) sigMtime = lm
+                    }
+                }
+            } catch (_: Exception) {
+            }
+        }
+        hashCache[projectDir]?.let { cached ->
+            if (now - cached.timestamp < HASH_CACHE_TTL_MS && sigMtime == cached.sigMtime) return cached.hash
+        }
         var hash = shouldUseRbs(projectDir).hashCode()
         hash = 31 * hash + hasCollection(projectDir).hashCode()
         findDocscribeYml(projectDir)?.let { hash = 31 * hash + it.lastModified().hashCode() }
-        val sigDir = File(projectDir, "sig")
-        if (sigDir.isDirectory) {
-            try {
-                sigDir
-                    .walkTopDown()
-                    .filter { it.isFile && it.extension == "rbs" }
-                    .forEach {
-                        hash = 31 * hash + it.name.hashCode()
-                        hash = 31 * hash + it.lastModified().hashCode()
-                        hash = 31 * hash + it.length().hashCode()
-                    }
-            } catch (_: Exception) {
-                // ignore walk errors
-            }
+        for (file in rbsFiles) {
+            hash = 31 * hash + file.name.hashCode()
+            hash = 31 * hash + file.lastModified().hashCode()
+            hash = 31 * hash + file.length().hashCode()
         }
+        hashCache[projectDir] = CachedHash(hash, now, sigMtime)
         return hash
     }
 
