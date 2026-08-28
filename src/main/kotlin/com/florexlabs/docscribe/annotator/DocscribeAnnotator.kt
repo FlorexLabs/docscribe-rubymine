@@ -128,6 +128,7 @@ class DocscribeAnnotator : ExternalAnnotator<AnnotatorFileInfo, DocscribeOutput>
      * @param info The file information collected by [collectInformation].
      * @return Parsed [DocscribeOutput], or `null` if the file has no issues or the check failed.
      */
+    @Suppress("DEPRECATION")
     override fun doAnnotate(info: AnnotatorFileInfo): DocscribeOutput? {
         val filePath = info.filePath
         log.info("DocScribe doAnnotate start file=$filePath stamp=${info.fileStamp} projectDir=${info.projectDir}")
@@ -166,6 +167,8 @@ class DocscribeAnnotator : ExternalAnnotator<AnnotatorFileInfo, DocscribeOutput>
                     }
                 }
             }
+        } catch (e: com.intellij.openapi.progress.ProcessCanceledException) {
+            throw e
         } catch (_: Exception) {
         }
 

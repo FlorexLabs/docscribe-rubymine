@@ -15,7 +15,6 @@ import com.intellij.openapi.progress.ProgressIndicator
 import com.intellij.openapi.progress.Task
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.LocalFileSystem
-import java.io.File
 
 /**
  * Run `docscribe update_types` to refresh YARD documentation from RBS signatures.
@@ -132,18 +131,4 @@ class UpdateTypesAction : AnAction() {
         val group = NotificationGroupManager.getInstance().getNotificationGroup("DocScribe")
         group.createNotification(content, type).notify(project)
     }
-
-    /**
-     * Check whether the Gemfile at [gemfilePath] contains the `rbs` gem.
-     *
-     * @param gemfilePath Absolute path to the Gemfile.
-     * @return `true` if `gem "rbs"` is declared in the Gemfile.
-     */
-    private fun gemfileHasRbs(gemfilePath: String): Boolean =
-        try {
-            val content = File(gemfilePath).readText()
-            Regex("""gem\s+['"]rbs['"]""").containsMatchIn(content)
-        } catch (_: Exception) {
-            false
-        }
 }
