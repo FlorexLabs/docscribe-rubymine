@@ -285,9 +285,26 @@ class DocscribeDaemon(
     }
 
     private fun buildRbsCliOverrides(projectDir: String): Map<String, Any?>? {
-        if (!RbsDetector.shouldUseRbs(projectDir)) return null
-        val overrides = mutableMapOf<String, Any?>("rbs" to true)
-        if (RbsDetector.hasCollection(projectDir)) overrides["rbs_collection"] = true
+        val overrides = mutableMapOf<String, Any?>()
+        val useRbs = RbsDetector.shouldUseRbs(projectDir)
+        if (useRbs) {
+            overrides["rbs"] = true
+            if (RbsDetector.hasCollection(projectDir)) overrides["rbs_collection"] = true
+        }
+        // Always pass validate_types when the setting is enabled, even without RBS
+        // This lets the gem's Yard::Validator flag Sym bol / Objec3t without RBS
+        val shouldValidate =
+            try {
+                com.florexlabs.docscribe.settings.DocscribeSettings
+                    .getInstance()
+                    .warnOnInvalidYardTypes
+            } catch (_: Exception) {
+                false
+            }
+        if (shouldValidate) {
+            overrides["validate_types"] = true
+        }
+        if (overrides.isEmpty()) return null
         // sig_dirs from default ['sig'] already handled by gem when rbs=true
         return overrides
     }
@@ -939,9 +956,24 @@ class DocscribeDaemon(
 
         @JvmStatic
         internal fun buildRbsCliOverridesStatic(projectDir: String): Map<String, Any?>? {
-            if (!RbsDetector.shouldUseRbs(projectDir)) return null
-            val overrides = mutableMapOf<String, Any?>("rbs" to true)
-            if (RbsDetector.hasCollection(projectDir)) overrides["rbs_collection"] = true
+            val overrides = mutableMapOf<String, Any?>()
+            val useRbs = RbsDetector.shouldUseRbs(projectDir)
+            if (useRbs) {
+                overrides["rbs"] = true
+                if (RbsDetector.hasCollection(projectDir)) overrides["rbs_collection"] = true
+            }
+            val shouldValidate =
+                try {
+                    com.florexlabs.docscribe.settings.DocscribeSettings
+                        .getInstance()
+                        .warnOnInvalidYardTypes
+                } catch (_: Exception) {
+                    false
+                }
+            if (shouldValidate) {
+                overrides["validate_types"] = true
+            }
+            if (overrides.isEmpty()) return null
             return overrides
         }
 
@@ -1123,9 +1155,21 @@ class DocscribeDaemon(
                     val rawMessage = change["message"]?.toString()
                     val (copName, severity, message) =
                         when (type) {
-                            "updated_param" -> Triple("Docscribe/UpdatedParam", "warning", rawMessage ?: "updated @param type from RBS")
-                            "updated_return" -> Triple("Docscribe/UpdatedReturn", "warning", rawMessage ?: "updated @return type from RBS")
-                            else -> Triple("DocScribe/MissingDocumentation", "convention", rawMessage ?: "Missing YARD documentation")
+                            "updated_param" -> {
+                                Triple("Docscribe/UpdatedParam", "warning", rawMessage ?: "updated @param type from RBS")
+                            }
+
+                            "updated_return" -> {
+                                Triple("Docscribe/UpdatedReturn", "warning", rawMessage ?: "updated @return type from RBS")
+                            }
+
+                            "invalid_type", "invalid_syntax", "type_mismatch_param", "type_mismatch_return" -> {
+                                Triple("Docscribe/InvalidType", "warning", rawMessage ?: "invalid YARD type")
+                            }
+
+                            else -> {
+                                Triple("DocScribe/MissingDocumentation", "convention", rawMessage ?: "Missing YARD documentation")
+                            }
                         }
                     mapOf(
                         "severity" to severity,

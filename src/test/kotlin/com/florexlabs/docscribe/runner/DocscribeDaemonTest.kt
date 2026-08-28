@@ -225,10 +225,31 @@ class DocscribeDaemonTest {
     @Test
     fun `buildBatchParams no rbs overrides when no sig`() {
         val dir = Files.createTempDirectory("rbs-batch-no").toFile()
+        val settings =
+            try {
+                com.florexlabs.docscribe.settings.DocscribeSettings
+                    .getInstance()
+            } catch (_: Exception) {
+                null
+            }
+        val saved =
+            try {
+                settings?.warnOnInvalidYardTypes ?: false
+            } catch (_: Exception) {
+                false
+            }
         try {
+            try {
+                settings?.let { it.warnOnInvalidYardTypes = false }
+            } catch (_: Exception) {
+            }
             val params = DocscribeDaemon.buildBatchParams(listOf("/tmp/a.rb"), dir.absolutePath)
             assertNull(params["cli_overrides"])
         } finally {
+            try {
+                settings?.let { it.warnOnInvalidYardTypes = saved }
+            } catch (_: Exception) {
+            }
             dir.deleteRecursively()
         }
     }
