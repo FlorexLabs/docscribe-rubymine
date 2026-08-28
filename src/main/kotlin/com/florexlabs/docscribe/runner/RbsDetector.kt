@@ -49,7 +49,7 @@ object RbsDetector {
      * Cached for 1 second to avoid repeated file I/O on EDT during typing, with sig mtime check.
      * Optimized to single walkTopDown to avoid double I/O.
      */
-    @Suppress("MagicNumber")
+    @Suppress("MagicNumber", "NestedBlockDepth")
     fun rbsHash(projectDir: String): Int {
         if (projectDir.isBlank()) return 0
         val now = System.currentTimeMillis()

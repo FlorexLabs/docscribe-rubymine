@@ -51,7 +51,10 @@ data class AnnotatorFileInfo(
  * The DocscribeSettingsChangeListener also clears the cache explicitly on settings change.
  */
 class DocscribeAnnotator : ExternalAnnotator<AnnotatorFileInfo, DocscribeOutput>() {
-    private val log = com.intellij.openapi.diagnostic.Logger.getInstance(DocscribeAnnotator::class.java)
+    private val log =
+        com.intellij.openapi.diagnostic.Logger
+            .getInstance(DocscribeAnnotator::class.java)
+
     /**
      * Collect file information for annotation when an editor is available.
      *
@@ -128,7 +131,7 @@ class DocscribeAnnotator : ExternalAnnotator<AnnotatorFileInfo, DocscribeOutput>
      * @param info The file information collected by [collectInformation].
      * @return Parsed [DocscribeOutput], or `null` if the file has no issues or the check failed.
      */
-    @Suppress("DEPRECATION")
+    @Suppress("CyclomaticComplexMethod", "LongMethod", "DEPRECATION")
     override fun doAnnotate(info: AnnotatorFileInfo): DocscribeOutput? {
         val filePath = info.filePath
         log.info("DocScribe doAnnotate start file=$filePath stamp=${info.fileStamp} projectDir=${info.projectDir}")
@@ -152,14 +155,20 @@ class DocscribeAnnotator : ExternalAnnotator<AnnotatorFileInfo, DocscribeOutput>
         try {
             val shouldSave =
                 com.intellij.openapi.application.ReadAction.compute<Boolean, RuntimeException> {
-                    val vFile = com.intellij.openapi.vfs.LocalFileSystem.getInstance().findFileByPath(filePath) ?: return@compute false
+                    val vFile =
+                        com.intellij.openapi.vfs.LocalFileSystem
+                            .getInstance()
+                            .findFileByPath(filePath) ?: return@compute false
                     val doc = FileDocumentManager.getInstance().getDocument(vFile) ?: return@compute false
                     FileDocumentManager.getInstance().isDocumentUnsaved(doc)
                 }
             if (shouldSave) {
                 com.intellij.openapi.application.ApplicationManager.getApplication().invokeAndWait {
                     com.intellij.openapi.application.ReadAction.run<RuntimeException> {
-                        val vFile = com.intellij.openapi.vfs.LocalFileSystem.getInstance().findFileByPath(filePath) ?: return@run
+                        val vFile =
+                            com.intellij.openapi.vfs.LocalFileSystem
+                                .getInstance()
+                                .findFileByPath(filePath) ?: return@run
                         val doc = FileDocumentManager.getInstance().getDocument(vFile) ?: return@run
                         if (FileDocumentManager.getInstance().isDocumentUnsaved(doc)) {
                             FileDocumentManager.getInstance().saveDocument(doc)
@@ -183,9 +192,13 @@ class DocscribeAnnotator : ExternalAnnotator<AnnotatorFileInfo, DocscribeOutput>
                 formatJson = true,
             )
         val result = DocscribeDaemon.executeWithFallback(info.project, options)
-        log.info("DocScribe doAnnotate daemon result success=${result.success} exit=${result.exitCode} stdoutBlank=${result.stdout.isBlank()} stderr=${result.stderr.take(200)}")
+        val stderrPreview = result.stderr.take(MAX_STDERR_PREVIEW)
+        log.info(
+            "DocScribe doAnnotate daemon result success=${result.success} " +
+                "exit=${result.exitCode} blank=${result.stdout.isBlank()} stderr=$stderrPreview",
+        )
 
-        // Another check for the same file started while this one was running — discard
+        // Another check for same file started while this one was running — discard
         if (fileGeneration[filePath] != generation) return null
 
         val output =
@@ -219,7 +232,9 @@ class DocscribeAnnotator : ExternalAnnotator<AnnotatorFileInfo, DocscribeOutput>
         annotationResult: DocscribeOutput?,
         holder: AnnotationHolder,
     ) {
-        log.info("DocScribe apply called file=${file.virtualFile?.path} result=${annotationResult?.files?.size} offenses=${annotationResult?.files?.sumOf { it.offenses.size }}")
+        val filePath = file.virtualFile?.path
+        val offenseCount = annotationResult?.files?.sumOf { it.offenses.size }
+        log.info("DocScribe apply file=$filePath result=${annotationResult?.files?.size} offenses=$offenseCount")
         if (annotationResult == null) return
         val document = PsiDocumentManager.getInstance(file.project).getDocument(file) ?: return
         for (parsedFile in annotationResult.files) {
@@ -236,9 +251,9 @@ class DocscribeAnnotator : ExternalAnnotator<AnnotatorFileInfo, DocscribeOutput>
                     } else {
                         HighlightSeverity.WARNING
                     }
-                // For RBS type mismatches, safe fix (-a -k -B --rbs) is a no-op for existing @param (only adds missing),
-                // so we must offer update_types (docscribe update_types) which does -AkB + -aB with rbs_collection and keeps descriptions via -k.
-                // Use a dedicated intention that delegates to update_types for RBS.
+                // For RBS type mismatches, safe fix is no-op for existing @param,
+                // so offer update_types which does -AkB + -aB with rbs_collection.
+                // Keeps descriptions via -k.
                 val fix =
                     if (isRbsTypeUpdate) {
                         DocscribeUpdateTypesIntention()
@@ -274,6 +289,8 @@ class DocscribeAnnotator : ExternalAnnotator<AnnotatorFileInfo, DocscribeOutput>
     // noinspection CompanionObjectInExtension
     @Suppress("CompanionObjectInExtension")
     companion object {
+        private const val MAX_STDERR_PREVIEW = 200
+
         /**
          * Generation counter per file path.
          *

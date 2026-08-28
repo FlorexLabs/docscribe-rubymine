@@ -113,7 +113,7 @@ class DocscribeAnnotatorCache {
             if (isRight) treeBits.clear(parent) else treeBits.set(parent)
             node = parent
             bitPos++
-            if (bitPos > 20) break // safety
+            if (bitPos > MAX_TREE_WALK_DEPTH) break // safety
         }
     }
 
@@ -147,6 +147,7 @@ class DocscribeAnnotatorCache {
     companion object {
         /** Maximum number of annotated files to cache. */
         const val MAX_CACHE_SIZE = 1000
+        private const val MAX_TREE_WALK_DEPTH = 20
 
         /**
          * Get the application-level [DocscribeAnnotatorCache] singleton.
