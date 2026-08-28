@@ -165,17 +165,15 @@ class DocscribeDaemon(
         projectDir: String? = null,
         formatJson: Boolean = false,
     ): RunResult {
-        synchronized(lock) {
-            val handle = ensureRunning(projectDir) ?: return fallback(command, file, projectDir, formatJson)
-            val params = if (command == "update_types") buildUpdateTypesParams(projectDir) else buildExecuteParams(file, projectDir)
-            val response = performRpcCall(handle, command, params)
-            // Fallback for older daemons that don't support update_types (< 1.6.2)
-            if (command == "update_types" && isUnknownMethodError(response)) {
-                log.warn("Daemon doesn't support update_types, falling back to CLI")
-                return fallback(command, file, projectDir, formatJson)
-            }
-            return processRpcResponse(response, command, file, projectDir, formatJson)
+        val handle = synchronized(lock) { ensureRunning(projectDir) } ?: return fallback(command, file, projectDir, formatJson)
+        val params = if (command == "update_types") buildUpdateTypesParams(projectDir) else buildExecuteParams(file, projectDir)
+        val response = performRpcCall(handle, command, params)
+        // Fallback for older daemons that don't support update_types (< 1.6.2)
+        if (command == "update_types" && isUnknownMethodError(response)) {
+            log.warn("Daemon doesn't support update_types, falling back to CLI")
+            return fallback(command, file, projectDir, formatJson)
         }
+        return processRpcResponse(response, command, file, projectDir, formatJson)
     }
 
     @VisibleForTesting
@@ -202,17 +200,15 @@ class DocscribeDaemon(
         files: List<String>,
         projectDir: String? = null,
     ): RunResult {
-        synchronized(lock) {
-            val handle = ensureRunning(projectDir)
-            if (handle == null || capabilities?.batchMode != true) {
-                log.info("check_batch not available, using CLI directory scan")
-                return fallback("check", file = null, projectDir = projectDir, formatJson = true)
-            }
-            val effectiveDir = projectDir ?: project.basePath ?: ""
-            val params = buildBatchParams(files, effectiveDir)
-            val response = rpcCall(handle, "check_batch", params)
-            return processBatchResponse(response, projectDir)
+        val handle = synchronized(lock) { ensureRunning(projectDir) }
+        if (handle == null || capabilities?.batchMode != true) {
+            log.info("check_batch not available, using CLI directory scan")
+            return fallback("check", file = null, projectDir = projectDir, formatJson = true)
         }
+        val effectiveDir = projectDir ?: project.basePath ?: ""
+        val params = buildBatchParams(files, effectiveDir)
+        val response = rpcCall(handle, "check_batch", params)
+        return processBatchResponse(response, projectDir)
     }
 
     /**

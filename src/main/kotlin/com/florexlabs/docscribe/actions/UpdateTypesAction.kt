@@ -1,16 +1,20 @@
 package com.florexlabs.docscribe.actions
 
+import com.florexlabs.docscribe.annotator.DocscribeAnnotatorCache
 import com.florexlabs.docscribe.runner.DocscribeDaemon
 import com.florexlabs.docscribe.runner.DocscribeRunner
+import com.florexlabs.docscribe.runner.RbsDetector
 import com.florexlabs.docscribe.runner.RunOptions
 import com.intellij.notification.NotificationGroupManager
 import com.intellij.notification.NotificationType
 import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
+import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.progress.ProgressIndicator
 import com.intellij.openapi.progress.Task
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.vfs.LocalFileSystem
 import java.io.File
 
 /**
@@ -31,13 +35,14 @@ class UpdateTypesAction : AnAction() {
                 notify(project, "No Gemfile found in project tree", NotificationType.ERROR)
                 return
             }
-        if (!gemfileHasRbs("$projectRoot/Gemfile")) {
-            notify(project, "RBS not found in Gemfile — update_types requires RBS", NotificationType.WARNING)
+        if (!RbsDetector.shouldUseRbs(projectRoot)) {
+            notify(project, "RBS not found — update_types requires RBS (sig/ or rbs gem)", NotificationType.WARNING)
             return
         }
 
         object : Task.Backgroundable(project, "DocScribe: updating types from RBS...", false) {
             var exitCode = -1
+            var stderrText = ""
 
             override fun run(indicator: ProgressIndicator) {
                 val options =
@@ -47,13 +52,24 @@ class UpdateTypesAction : AnAction() {
                     )
                 val result = DocscribeDaemon.executeWithFallback(project, options)
                 exitCode = result.exitCode
+                stderrText = result.stderr
+                // Clear annotator cache — files on disk changed, cached check results are stale
+                try {
+                    DocscribeAnnotatorCache.getInstance().clear()
+                } catch (_: Exception) {
+                }
                 // Refresh VFS so the editor shows the updated YARD docs
                 try {
-                    val vFile =
-                        com.intellij.openapi.vfs.LocalFileSystem
-                            .getInstance()
-                            .findFileByPath(projectRoot)
+                    val vFile = LocalFileSystem.getInstance().findFileByPath(projectRoot)
                     vFile?.refresh(true, true)
+                } catch (_: Exception) {
+                }
+                // Also reload open documents
+                try {
+                    val mgr = FileDocumentManager.getInstance()
+                    for (file in com.intellij.openapi.fileEditor.FileEditorManager.getInstance(project).openFiles) {
+                        mgr.reloadFiles(file)
+                    }
                 } catch (_: Exception) {
                 }
             }
@@ -62,8 +78,13 @@ class UpdateTypesAction : AnAction() {
                 if (exitCode == 0) {
                     notify(project, "DocScribe: types updated successfully", NotificationType.INFORMATION)
                 } else {
-                    notify(project, "DocScribe: update_types finished with exit code $exitCode", NotificationType.WARNING)
+                    val msg = if (stderrText.isNotBlank()) stderrText.take(500) else "exit code $exitCode"
+                    notify(project, "DocScribe: update_types failed: $msg", NotificationType.WARNING)
                 }
+            }
+
+            override fun onThrowable(error: Throwable) {
+                notify(project, "DocScribe: update_types error: ${error.message}", NotificationType.ERROR)
             }
         }.queue()
     }
@@ -84,9 +105,10 @@ class UpdateTypesAction : AnAction() {
             e.presentation.isEnabledAndVisible = false
             return
         }
-        // Always visible when RBS is in Gemfile — don't wait for annotator to find errors
-        // The action itself will no-op with success if no RBS mismatches, but should be clickable immediately
-        e.presentation.isEnabledAndVisible = gemfileHasRbs("$projectRoot/Gemfile")
+        // Visible when RBS is available (sig/ or Gemfile.lock or docscribe.yml), not just Gemfile declaration.
+        // This matches RbsDetector.shouldUseRbs used by annotator/daemon, so button is not hidden
+        // when sig/ exists but Gemfile doesn't directly declare `gem "rbs"` (e.g. transitive).
+        e.presentation.isEnabledAndVisible = RbsDetector.shouldUseRbs(projectRoot)
         e.presentation.isEnabled = true
     }
 

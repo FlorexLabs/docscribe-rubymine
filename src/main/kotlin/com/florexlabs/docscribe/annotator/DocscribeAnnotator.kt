@@ -51,6 +51,7 @@ data class AnnotatorFileInfo(
  * The DocscribeSettingsChangeListener also clears the cache explicitly on settings change.
  */
 class DocscribeAnnotator : ExternalAnnotator<AnnotatorFileInfo, DocscribeOutput>() {
+    private val log = com.intellij.openapi.diagnostic.Logger.getInstance(DocscribeAnnotator::class.java)
     /**
      * Collect file information for annotation when an editor is available.
      *
@@ -79,11 +80,13 @@ class DocscribeAnnotator : ExternalAnnotator<AnnotatorFileInfo, DocscribeOutput>
 
         // Use a fast hash for EDT — rbsHash does file I/O, so we cache it and only recompute in doAnnotate
         val configHash = Objects.hash(DocscribeSettings.getInstance().hideCommentsByDefault, projectDir.hashCode())
+        // Use PsiFile stamp + document stamp for reliable change detection (VirtualFile stamp can be 0 for non-indexed files)
+        val fileStamp = file.modificationStamp
 
         return AnnotatorFileInfo(
             filePath = vFile.path,
             projectDir = projectDir,
-            fileStamp = vFile.modificationStamp,
+            fileStamp = fileStamp,
             configHash = configHash,
             project = file.project,
         )
@@ -103,11 +106,12 @@ class DocscribeAnnotator : ExternalAnnotator<AnnotatorFileInfo, DocscribeOutput>
         val projectDir = file.project.basePath ?: return null
 
         val configHash = Objects.hash(DocscribeSettings.getInstance().hideCommentsByDefault, projectDir.hashCode())
+        val fileStamp = file.modificationStamp
 
         return AnnotatorFileInfo(
             filePath = vFile.path,
             projectDir = projectDir,
-            fileStamp = vFile.modificationStamp,
+            fileStamp = fileStamp,
             configHash = configHash,
             project = file.project,
         )
@@ -126,18 +130,46 @@ class DocscribeAnnotator : ExternalAnnotator<AnnotatorFileInfo, DocscribeOutput>
      */
     override fun doAnnotate(info: AnnotatorFileInfo): DocscribeOutput? {
         val filePath = info.filePath
+        log.info("DocScribe doAnnotate start file=$filePath stamp=${info.fileStamp} projectDir=${info.projectDir}")
         val generation = fileGeneration.merge(filePath, 1L) { _, old -> old + 1 }
 
         // Recompute configHash with RBS on background thread (not EDT) to include RBS state
         val bgConfigHash = Objects.hash(DocscribeSettings.getInstance().hideCommentsByDefault, RbsDetector.rbsHash(info.projectDir))
         val effectiveHash = if (bgConfigHash != info.configHash) bgConfigHash else info.configHash
+        log.info("DocScribe doAnnotate hashes infoHash=${info.configHash} bgHash=$bgConfigHash effective=$effectiveHash")
 
         val cache = DocscribeAnnotatorCache.getInstance()
         val cached = cache.get(info.projectDir, filePath, info.fileStamp, effectiveHash)
+        log.info("DocScribe doAnnotate cache check cached=${cached != null} size=${cached?.files?.size}")
         if (cached != null) {
+            log.info("DocScribe doAnnotate cache hit returning ${cached.files.size} files")
             return if (cached.files.isEmpty()) null else cached
         }
 
+        // If document is unsaved, try to save it so daemon sees latest YARD invalid type.
+        // Must use ReadAction for getDocument/isDocumentUnsaved (background thread has no read access).
+        try {
+            val shouldSave =
+                com.intellij.openapi.application.ReadAction.compute<Boolean, RuntimeException> {
+                    val vFile = com.intellij.openapi.vfs.LocalFileSystem.getInstance().findFileByPath(filePath) ?: return@compute false
+                    val doc = FileDocumentManager.getInstance().getDocument(vFile) ?: return@compute false
+                    FileDocumentManager.getInstance().isDocumentUnsaved(doc)
+                }
+            if (shouldSave) {
+                com.intellij.openapi.application.ApplicationManager.getApplication().invokeAndWait {
+                    com.intellij.openapi.application.ReadAction.run<RuntimeException> {
+                        val vFile = com.intellij.openapi.vfs.LocalFileSystem.getInstance().findFileByPath(filePath) ?: return@run
+                        val doc = FileDocumentManager.getInstance().getDocument(vFile) ?: return@run
+                        if (FileDocumentManager.getInstance().isDocumentUnsaved(doc)) {
+                            FileDocumentManager.getInstance().saveDocument(doc)
+                        }
+                    }
+                }
+            }
+        } catch (_: Exception) {
+        }
+
+        log.info("DocScribe doAnnotate calling daemon for $filePath")
         // For RBS projects, the check must include RBS types; ensure the daemon is warmed up
         // in the background to reduce perceived delay on first edit after save.
         val options =
@@ -148,6 +180,7 @@ class DocscribeAnnotator : ExternalAnnotator<AnnotatorFileInfo, DocscribeOutput>
                 formatJson = true,
             )
         val result = DocscribeDaemon.executeWithFallback(info.project, options)
+        log.info("DocScribe doAnnotate daemon result success=${result.success} exit=${result.exitCode} stdoutBlank=${result.stdout.isBlank()} stderr=${result.stderr.take(200)}")
 
         // Another check for the same file started while this one was running — discard
         if (fileGeneration[filePath] != generation) return null
@@ -159,10 +192,13 @@ class DocscribeAnnotator : ExternalAnnotator<AnnotatorFileInfo, DocscribeOutput>
                 else -> DocscribeOutputParser.parseJson(result.stdout)
             }
 
+        log.info("DocScribe doAnnotate parsed output files=${output?.files?.size} offenses=${output?.files?.firstOrNull()?.offenses?.size}")
         if (output != null) {
             cache.put(info.projectDir, filePath, info.fileStamp, effectiveHash, output)
         }
-        return if (output == null || output.files.isEmpty()) null else output
+        val ret = if (output == null || output.files.isEmpty()) null else output
+        log.info("DocScribe doAnnotate returning ${if (ret == null) "null" else "${ret.files.size} files"}")
+        return ret
     }
 
     /**
@@ -180,6 +216,7 @@ class DocscribeAnnotator : ExternalAnnotator<AnnotatorFileInfo, DocscribeOutput>
         annotationResult: DocscribeOutput?,
         holder: AnnotationHolder,
     ) {
+        log.info("DocScribe apply called file=${file.virtualFile?.path} result=${annotationResult?.files?.size} offenses=${annotationResult?.files?.sumOf { it.offenses.size }}")
         if (annotationResult == null) return
         val document = PsiDocumentManager.getInstance(file.project).getDocument(file) ?: return
         for (parsedFile in annotationResult.files) {
