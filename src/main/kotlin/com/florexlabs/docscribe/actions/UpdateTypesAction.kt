@@ -49,7 +49,10 @@ class UpdateTypesAction : AnAction() {
                 exitCode = result.exitCode
                 // Refresh VFS so the editor shows the updated YARD docs
                 try {
-                    val vFile = com.intellij.openapi.vfs.LocalFileSystem.getInstance().findFileByPath(projectRoot)
+                    val vFile =
+                        com.intellij.openapi.vfs.LocalFileSystem
+                            .getInstance()
+                            .findFileByPath(projectRoot)
                     vFile?.refresh(true, true)
                 } catch (_: Exception) {
                 }

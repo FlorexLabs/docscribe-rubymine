@@ -46,6 +46,7 @@ class DocscribeUpdateTypesIntention : IntentionAction {
         object : Task.Backgroundable(project, "DocScribe: updating types from RBS...", false) {
             var failed = false
             var exitCode = -1
+
             override fun run(indicator: ProgressIndicator) {
                 val options = RunOptions(projectDir = projectRoot, subcommand = "update_types")
                 val result = DocscribeDaemon.executeWithFallback(project, options)

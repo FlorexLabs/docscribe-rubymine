@@ -34,7 +34,12 @@ object RbsDetector {
      */
     fun hasCollection(projectDir: String): Boolean = projectDir.isNotBlank() && File(projectDir, "rbs_collection.lock.yaml").exists()
 
-    private data class CachedHash(val hash: Int, val timestamp: Long, val sigMtime: Long)
+    private data class CachedHash(
+        val hash: Int,
+        val timestamp: Long,
+        val sigMtime: Long,
+    )
+
     private val hashCache = java.util.concurrent.ConcurrentHashMap<String, CachedHash>()
     private const val HASH_CACHE_TTL_MS = 1000L
 
@@ -48,7 +53,17 @@ object RbsDetector {
         if (projectDir.isBlank()) return 0
         val now = System.currentTimeMillis()
         val sigDir = File(projectDir, "sig")
-        val sigMtime = if (sigDir.isDirectory) sigDir.walkTopDown().filter { it.isFile && it.extension == "rbs" }.map { it.lastModified() }.maxOrNull() ?: 0 else 0
+        val sigMtime =
+            if (sigDir.isDirectory) {
+                sigDir
+                    .walkTopDown()
+                    .filter { it.isFile && it.extension == "rbs" }
+                    .map { it.lastModified() }
+                    .maxOrNull()
+                    ?: 0
+            } else {
+                0
+            }
         hashCache[projectDir]?.let { cached ->
             if (now - cached.timestamp < HASH_CACHE_TTL_MS && sigMtime == cached.sigMtime) return cached.hash
         }
