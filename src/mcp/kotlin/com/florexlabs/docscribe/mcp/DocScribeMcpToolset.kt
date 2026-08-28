@@ -9,6 +9,33 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.project.ProjectManager
 import kotlinx.serialization.Serializable
 
+@Serializable
+data class CheckResult(
+    val projectPath: String?,
+    val filePath: String?,
+    val success: Boolean,
+    val hasIssues: Boolean,
+    val exitCode: Int,
+    val stdout: String,
+    val stderr: String,
+)
+
+@Serializable
+data class FixResult(
+    val projectPath: String?,
+    val filePath: String?,
+    val success: Boolean,
+    val exitCode: Int,
+    val stdout: String,
+    val stderr: String,
+)
+
+@Serializable
+data class DoctorResult(
+    val projectPath: String?,
+    val report: String,
+)
+
 /**
  * MCP toolset exposing DocScribe actions for API testing via JetBrains MCP.
  * Registered in `withMcpServer.xml` as `mcpServer.mcpToolset`.
@@ -57,33 +84,6 @@ class DocScribeMcpToolset : McpToolset {
         return true
     }
 
-    @Serializable
-    data class CheckResult(
-        val projectPath: String?,
-        val filePath: String?,
-        val success: Boolean,
-        val hasIssues: Boolean,
-        val exitCode: Int,
-        val stdout: String,
-        val stderr: String,
-    )
-
-    @Serializable
-    data class FixResult(
-        val projectPath: String?,
-        val filePath: String?,
-        val success: Boolean,
-        val exitCode: Int,
-        val stdout: String,
-        val stderr: String,
-    )
-
-    @Serializable
-    data class DoctorResult(
-        val projectPath: String?,
-        val report: String,
-    )
-
     private fun findProject(
         projectPath: String?,
         filePath: String? = null,
@@ -115,22 +115,22 @@ class DocScribeMcpToolset : McpToolset {
     suspend fun docscribe_check_file(
         filePath: String,
         projectPath: String? = null,
-    ): CheckResult {
+    ): String {
         val project =
             findProject(projectPath, filePath)
-                ?: return CheckResult(projectPath, filePath, false, false, 2, "", "No open project found for $projectPath / $filePath")
+                ?: return "No open project found for $projectPath / $filePath"
         val pPath = resolveProjectPath(project, projectPath)
         val daemon = project.getService(DocscribeDaemon::class.java)
         val run = daemon.execute("check", file = filePath, projectDir = pPath, formatJson = true)
-        return CheckResult(pPath, filePath, run.success, run.hasIssues, run.exitCode, run.stdout, run.stderr)
+        return "success=${run.success} hasIssues=${run.hasIssues} exitCode=${run.exitCode}\nstdout=${run.stdout}\nstderr=${run.stderr}"
     }
 
     @McpTool
     @McpDescription("Check all Ruby files in workspace for missing YARD documentation (runs docscribe check on project)")
-    suspend fun docscribe_check_workspace(projectPath: String? = null): CheckResult {
+    suspend fun docscribe_check_workspace(projectPath: String? = null): String {
         val project =
             findProject(projectPath)
-                ?: return CheckResult(projectPath, null, false, false, 2, "", "No open project")
+                ?: return "No open project"
         val pPath = resolveProjectPath(project, projectPath)
         val daemon = project.getService(DocscribeDaemon::class.java)
         return try {
@@ -138,20 +138,12 @@ class DocScribeMcpToolset : McpToolset {
                 com.florexlabs.docscribe.actions
                     .collectRubyFiles(project, pPath)
             if (files.isEmpty()) {
-                return CheckResult(
-                    pPath,
-                    null,
-                    true,
-                    false,
-                    0,
-                    """{"files":[],"summary":{"offense_count":0,"inspected_file_count":0}}""",
-                    "",
-                )
+                return """{"files":[],"summary":{"offense_count":0,"inspected_file_count":0}}"""
             }
             val run = daemon.executeBatch(files, pPath)
-            CheckResult(pPath, null, run.success, run.hasIssues, run.exitCode, run.stdout, run.stderr)
+            "success=${run.success} hasIssues=${run.hasIssues} exitCode=${run.exitCode}\nstdout=${run.stdout}\nstderr=${run.stderr}"
         } catch (e: Exception) {
-            CheckResult(pPath, null, false, false, 2, "", e.message ?: "error")
+            "error: ${e.message}"
         }
     }
 
@@ -160,10 +152,10 @@ class DocScribeMcpToolset : McpToolset {
     suspend fun docscribe_safe_fix(
         filePath: String,
         projectPath: String? = null,
-    ): FixResult {
+    ): String {
         val project =
             findProject(projectPath, filePath)
-                ?: return FixResult(projectPath, filePath, false, 2, "", "No project")
+                ?: return "No project"
         val pPath = resolveProjectPath(project, projectPath)
         val daemon = project.getService(DocscribeDaemon::class.java)
         val run = daemon.execute("safe_fix", file = filePath, projectDir = pPath, formatJson = false)
@@ -176,7 +168,7 @@ class DocScribeMcpToolset : McpToolset {
             vFile?.refresh(false, false)
         } catch (_: Exception) {
         }
-        return FixResult(pPath, filePath, run.success, run.exitCode, run.stdout, run.stderr)
+        return "success=${run.success} exitCode=${run.exitCode}\nstdout=${run.stdout}\nstderr=${run.stderr}"
     }
 
     @McpTool
@@ -184,10 +176,10 @@ class DocScribeMcpToolset : McpToolset {
     suspend fun docscribe_aggressive_fix(
         filePath: String,
         projectPath: String? = null,
-    ): FixResult {
+    ): String {
         val project =
             findProject(projectPath, filePath)
-                ?: return FixResult(projectPath, filePath, false, 2, "", "No project")
+                ?: return "No project"
         val pPath = resolveProjectPath(project, projectPath)
         val daemon = project.getService(DocscribeDaemon::class.java)
         val run = daemon.execute("aggressive_fix", file = filePath, projectDir = pPath, formatJson = false)
@@ -199,15 +191,15 @@ class DocScribeMcpToolset : McpToolset {
             vFile?.refresh(false, false)
         } catch (_: Exception) {
         }
-        return FixResult(pPath, filePath, run.success, run.exitCode, run.stdout, run.stderr)
+        return "success=${run.success} exitCode=${run.exitCode}\nstdout=${run.stdout}\nstderr=${run.stderr}"
     }
 
     @McpTool
     @McpDescription("Update YARD types from RBS signatures (runs docscribe update_types)")
-    suspend fun docscribe_update_types(projectPath: String? = null): FixResult {
+    suspend fun docscribe_update_types(projectPath: String? = null): String {
         val project =
             findProject(projectPath)
-                ?: return FixResult(projectPath, null, false, 2, "", "No project")
+                ?: return "No project"
         val pPath = resolveProjectPath(project, projectPath)
         val daemon = project.getService(DocscribeDaemon::class.java)
         val run = daemon.execute("update_types", file = null, projectDir = pPath, formatJson = false)
@@ -219,15 +211,15 @@ class DocScribeMcpToolset : McpToolset {
             vFile?.refresh(true, true)
         } catch (_: Exception) {
         }
-        return FixResult(pPath, null, run.success, run.exitCode, run.stdout, run.stderr)
+        return "success=${run.success} exitCode=${run.exitCode}\nstdout=${run.stdout}\nstderr=${run.stderr}"
     }
 
     @McpTool
     @McpDescription("Diagnose DocScribe setup (Ruby SDK, gem, daemon, RBS status)")
-    suspend fun docscribe_doctor(projectPath: String? = null): DoctorResult {
+    suspend fun docscribe_doctor(projectPath: String? = null): String {
         val project =
             findProject(projectPath)
-                ?: return DoctorResult(projectPath, "No open project for $projectPath")
+                ?: return "No open project for $projectPath"
         // Reuse DoctorAction logic (duplicated to avoid making buildReport public)
         val daemon = project.getService(DocscribeDaemon::class.java)
         val basePath = project.basePath ?: "?"
@@ -308,6 +300,6 @@ class DocScribeMcpToolset : McpToolset {
             lines += "Settings: hideCommentsByDefault=$hide"
         } catch (_: Exception) {
         }
-        return DoctorResult(projectPath ?: basePath, lines.joinToString("\n"))
+        return lines.joinToString("\n")
     }
 }
