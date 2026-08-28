@@ -6,14 +6,19 @@ import java.util.Objects
 
 class DocscribeAnnotatorCacheSettingsTest : BasePlatformTestCase() {
     private var savedHideCommentsByDefault = false
+    private var savedWarnOnInvalidYardTypes = true
 
     override fun setUp() {
         super.setUp()
-        savedHideCommentsByDefault = DocscribeSettings.getInstance().hideCommentsByDefault
+        val settings = DocscribeSettings.getInstance()
+        savedHideCommentsByDefault = settings.hideCommentsByDefault
+        savedWarnOnInvalidYardTypes = settings.warnOnInvalidYardTypes
     }
 
     override fun tearDown() {
-        DocscribeSettings.getInstance().hideCommentsByDefault = savedHideCommentsByDefault
+        val settings = DocscribeSettings.getInstance()
+        settings.hideCommentsByDefault = savedHideCommentsByDefault
+        settings.warnOnInvalidYardTypes = savedWarnOnInvalidYardTypes
         super.tearDown()
     }
 
@@ -40,7 +45,22 @@ class DocscribeAnnotatorCacheSettingsTest : BasePlatformTestCase() {
         val file = myFixture.configureByText("test.rb", "class Foo\nend")
         val info = DocscribeAnnotator().collectInformation(file)
         assertNotNull("should collect info for .rb file", info)
-        val expectedHash = Objects.hash(DocscribeSettings.getInstance().hideCommentsByDefault)
+        val projectDir = file.project.basePath ?: ""
+        // collectInformation now uses projectDir.hashCode() on EDT for speed; rbsHash is computed in doAnnotate
+        val settings = DocscribeSettings.getInstance()
+        val expectedHash = Objects.hash(settings.hideCommentsByDefault, settings.warnOnInvalidYardTypes, projectDir.hashCode())
         assertEquals("configHash should match settings hash", expectedHash, info!!.configHash)
+    }
+
+    fun testConfigHashChangesWhenWarnOnInvalidYardTypesChanges() {
+        val settings = DocscribeSettings.getInstance()
+        val before = settings.warnOnInvalidYardTypes
+        val hashBefore = Objects.hash(settings.hideCommentsByDefault, before)
+        settings.warnOnInvalidYardTypes = !before
+        val hashAfter = Objects.hash(settings.hideCommentsByDefault, settings.warnOnInvalidYardTypes)
+        assertTrue(
+            "configHash should change when warnOnInvalidYardTypes toggles: $hashBefore -> $hashAfter",
+            hashBefore != hashAfter,
+        )
     }
 }

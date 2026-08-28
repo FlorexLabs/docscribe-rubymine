@@ -69,11 +69,12 @@
         </ul>
     ]]></change-notes>
 
-  <version>0.1.6</version>
+  <version>0.1.7</version>
   <idea-version since-build="261" until-build="262.*"/>
 
   <depends>com.intellij.modules.platform</depends>
   <depends optional="true" config-file="withRubyPlugin.xml">com.intellij.modules.ruby</depends>
+  <depends optional="true" config-file="withMcpServer.xml">com.intellij.mcpServer</depends>
 
   <extensions defaultExtensionNs="com.intellij">
     <applicationService serviceImplementation="com.florexlabs.docscribe.settings.DocscribeSettings"/>

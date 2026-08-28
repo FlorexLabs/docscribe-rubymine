@@ -35,6 +35,7 @@ data class RunOptions(
     val formatJson: Boolean = true,
     val subcommand: String? = null,
     val bundlePath: String? = null,
+    val validateTypes: Boolean = false,
 )
 
 /**
@@ -173,12 +174,41 @@ object DocscribeRunner {
         strategy: DocscribeStrategy,
         formatJson: Boolean,
         filePath: String? = null,
+    ): List<String> = getCommandArgs(strategy, formatJson, filePath, useRbs = false, useRbsCollection = false)
+
+    /**
+     * Overload with explicit RBS flags.
+     */
+    fun getCommandArgs(
+        strategy: DocscribeStrategy,
+        formatJson: Boolean,
+        filePath: String?,
+        useRbs: Boolean,
+        useRbsCollection: Boolean,
+    ): List<String> = getCommandArgs(strategy, formatJson, filePath, useRbs, useRbsCollection, validateTypes = false)
+
+    /**
+     * Overload with explicit RBS and validate_types flags.
+     */
+    fun getCommandArgs(
+        strategy: DocscribeStrategy,
+        formatJson: Boolean,
+        filePath: String?,
+        useRbs: Boolean,
+        useRbsCollection: Boolean,
+        validateTypes: Boolean,
     ): List<String> {
         val args = mutableListOf<String>()
         when (strategy) {
             DocscribeStrategy.SAFE -> {
-                args.add("-a")
-                args.add("-B")
+                if (useRbs) {
+                    // For RBS type mismatches, safe alone does nothing (needs aggressive to update types),
+                    // but we use -k to preserve manual descriptions
+                    args.addAll(listOf("-A", "-k", "-B"))
+                } else {
+                    args.add("-a")
+                    args.add("-B")
+                }
             }
 
             DocscribeStrategy.AGGRESSIVE -> {
@@ -186,6 +216,13 @@ object DocscribeRunner {
             }
 
             DocscribeStrategy.CHECK -> {}
+        }
+        if (useRbs) {
+            args.add("--rbs")
+            if (useRbsCollection) args.add("--rbs-collection")
+        }
+        if (validateTypes) {
+            args.add("--validate-types")
         }
         if (formatJson && strategy == DocscribeStrategy.CHECK) {
             args.addAll(listOf("--format", "json"))
@@ -212,11 +249,33 @@ object DocscribeRunner {
         executor: CommandExecutor = DefaultCommandExecutor(),
     ): RunResult {
         val projectRoot = options.projectDir
+        val useRbs = RbsDetector.shouldUseRbs(projectRoot)
+        val useCollection = useRbs && RbsDetector.hasCollection(projectRoot)
+        val shouldValidate =
+            try {
+                options.validateTypes ||
+                    com.florexlabs.docscribe.settings.DocscribeSettings
+                        .getInstance()
+                        .warnOnInvalidYardTypes
+            } catch (_: Exception) {
+                options.validateTypes
+            }
         val args =
             if (options.subcommand != null) {
-                listOf(options.subcommand, projectRoot)
+                // For update_types, the gem's cli/update_types handles --rbs/--rbs-collection internally,
+                // but --validate-types should still be passed as an extra arg if needed
+                // update_types handles validate-types via config, no extra CLI flag needed
+                val base = mutableListOf(options.subcommand, projectRoot)
+                base
             } else {
-                getCommandArgs(options.strategy, options.formatJson, options.file)
+                getCommandArgs(
+                    options.strategy,
+                    options.formatJson,
+                    options.file,
+                    useRbs,
+                    useCollection,
+                    shouldValidate,
+                )
             }
         return executor.execute(options.bundlePath ?: "bundle", listOf("exec", "docscribe") + args, projectRoot)
     }

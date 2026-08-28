@@ -6,6 +6,8 @@ import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.io.File
+import java.nio.file.Files
 
 class DocscribeDaemonTest {
     // --- buildRpcRequestJson edge cases (not covered by RpcProtocolTest) ---
@@ -111,44 +113,27 @@ class DocscribeDaemonTest {
 
     @Test
     fun `socket is alive while the file exists`() {
-        val dir =
-            java.nio.file.Files
-                .createTempDirectory("docscribe-sock-test")
+        val dir = Files.createTempDirectory("docscribe-sock-test")
         val sock = dir.resolve("docscribe.sock")
-        assertTrue(
-            java.nio.file.Files
-                .createFile(sock)
-                .toFile()
-                .exists(),
-        )
+        assertTrue(Files.createFile(sock).toFile().exists())
         try {
             assertTrue(isServerSocketAlive(sock))
         } finally {
-            java.nio.file.Files
-                .deleteIfExists(sock)
-            java.nio.file.Files
-                .deleteIfExists(dir)
+            Files.deleteIfExists(sock)
+            Files.deleteIfExists(dir)
         }
     }
 
     @Test
     fun `socket is dead after the file is removed`() {
-        val dir =
-            java.nio.file.Files
-                .createTempDirectory("docscribe-sock-test")
+        val dir = Files.createTempDirectory("docscribe-sock-test")
         val sock = dir.resolve("docscribe.sock")
-        assertTrue(
-            java.nio.file.Files
-                .createFile(sock)
-                .toFile()
-                .exists(),
-        )
-        java.nio.file.Files
-            .delete(sock)
+        assertTrue(Files.createFile(sock).toFile().exists())
+        Files.delete(sock)
         try {
             assertFalse(isServerSocketAlive(sock))
         } finally {
-            java.nio.file.Files
+            Files
                 .deleteIfExists(dir)
         }
     }
@@ -177,5 +162,95 @@ class DocscribeDaemonTest {
         configureLocaleEnv(env, systemLang = "ru_RU.UTF-8")
         assertEquals("ru_RU.UTF-8", env["LANG"])
         assertEquals("ru_RU.UTF-8", env["LC_ALL"])
+    }
+
+    // --- update_types handling (fix/daemon-update-types) ---
+
+    @Test
+    fun `isUnknownMethodError true for -32601`() {
+        val resp = mapOf("error" to mapOf("code" to -32601, "message" to "Unknown method: update_types"))
+        assertTrue(DocscribeDaemon.isUnknownMethodError(resp))
+    }
+
+    @Test
+    fun `isUnknownMethodError false for other codes`() {
+        assertFalse(DocscribeDaemon.isUnknownMethodError(mapOf("error" to mapOf("code" to -32600))))
+        assertFalse(DocscribeDaemon.isUnknownMethodError(mapOf("result" to mapOf("ok" to true))))
+        assertFalse(DocscribeDaemon.isUnknownMethodError(null))
+        assertFalse(DocscribeDaemon.isUnknownMethodError(mapOf("error" to mapOf("message" to "no code"))))
+    }
+
+    @Test
+    fun `buildUpdateTypesParams includes dir`() {
+        val params = DocscribeDaemon.buildUpdateTypesParams("/tmp/myproject")
+        assertEquals("/tmp/myproject", params["dir"])
+    }
+
+    @Test
+    fun `buildUpdateTypesParams includes rbs cli_overrides when sig exists`() {
+        val dir = Files.createTempDirectory("rbs-update-types").toFile()
+        try {
+            val sig = File(dir, "sig")
+            sig.mkdir()
+            File(sig, "a.rbs").writeText("class A; end")
+            val params = DocscribeDaemon.buildUpdateTypesParams(dir.absolutePath)
+            assertEquals(dir.absolutePath, params["dir"])
+            @Suppress("UNCHECKED_CAST")
+            val overrides = params["cli_overrides"] as? Map<String, Any?>
+            assertNotNull(overrides)
+            assertEquals(true, overrides?.get("rbs"))
+        } finally {
+            dir.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun `buildBatchParams includes rbs cli_overrides when sig exists`() {
+        val dir = Files.createTempDirectory("rbs-batch").toFile()
+        try {
+            val sig = File(dir, "sig")
+            sig.mkdir()
+            File(sig, "b.rbs").writeText("class B; end")
+            val params = DocscribeDaemon.buildBatchParams(listOf("/tmp/a.rb"), dir.absolutePath)
+
+            @Suppress("UNCHECKED_CAST")
+            val overrides = params["cli_overrides"] as? Map<String, Any?>
+            assertNotNull(overrides)
+            assertEquals(true, overrides?.get("rbs"))
+        } finally {
+            dir.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun `buildBatchParams no rbs overrides when no sig`() {
+        val dir = Files.createTempDirectory("rbs-batch-no").toFile()
+        val settings =
+            try {
+                com.florexlabs.docscribe.settings.DocscribeSettings
+                    .getInstance()
+            } catch (_: Exception) {
+                null
+            }
+        val saved =
+            try {
+                settings?.warnOnInvalidYardTypes ?: false
+            } catch (_: Exception) {
+                false
+            }
+        try {
+            try {
+                settings?.let { it.warnOnInvalidYardTypes = false }
+            } catch (_: Exception) {
+            }
+            val params = DocscribeDaemon.buildBatchParams(listOf("/tmp/a.rb"), dir.absolutePath)
+            assertNull(params["cli_overrides"])
+        } finally {
+            try {
+                settings?.let { it.warnOnInvalidYardTypes = saved }
+            } catch (_: Exception) {
+            }
+            dir.deleteRecursively()
+        }
     }
 }

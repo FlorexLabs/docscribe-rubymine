@@ -13,6 +13,15 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha }}
 
+      - name: Ensure MCP not in stdlib
+        run: |
+          if [ -d "src/main/kotlin/com/florexlabs/docscribe/mcp" ] || [ -f "src/main/resources/META-INF/withMcpServer.xml" ]; then
+            echo "❌ MCP files must not be in src/main for CI (run ./gradlew disableMcp before push)"
+            echo "   Found: src/main/.../mcp or withMcpServer.xml"
+            exit 1
+          fi
+          echo "✅ No MCP in stdlib"
+
       - uses: actions/setup-java@v4
         with:
           java-version: 21
@@ -108,3 +117,19 @@ jobs:
 
       - name: Build
         run: ./gradlew buildPlugin
+
+      - name: Check change-notes for release branch
+        if: startsWith(github.head_ref, 'v')
+        run: |
+          HEAD_BRANCH="${{ github.head_ref }}"
+          if ! echo "$HEAD_BRANCH" | grep -qE '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "⏭️ Skipping: not a version branch (head is $HEAD_BRANCH)"
+            exit 0
+          fi
+          VERSION=$(echo "$HEAD_BRANCH" | tr -d 'v')
+          if ! grep -q "<h3>$VERSION</h3>" src/main/resources/META-INF/plugin.xml; then
+            echo "❌ Missing <h3>$VERSION</h3> in src/main/resources/META-INF/plugin.xml <change-notes>"
+            echo "   Add release notes for $VERSION to <change-notes> before merging $HEAD_BRANCH"
+            exit 1
+          fi
+          echo "✅ Found <h3>$VERSION</h3> in change-notes"
