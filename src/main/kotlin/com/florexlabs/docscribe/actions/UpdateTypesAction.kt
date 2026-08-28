@@ -81,7 +81,10 @@ class UpdateTypesAction : AnAction() {
             e.presentation.isEnabledAndVisible = false
             return
         }
+        // Always visible when RBS is in Gemfile — don't wait for annotator to find errors
+        // The action itself will no-op with success if no RBS mismatches, but should be clickable immediately
         e.presentation.isEnabledAndVisible = gemfileHasRbs("$projectRoot/Gemfile")
+        e.presentation.isEnabled = true
     }
 
     /**
