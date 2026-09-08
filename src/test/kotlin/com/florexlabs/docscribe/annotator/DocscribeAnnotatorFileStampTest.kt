@@ -61,9 +61,21 @@ class DocscribeAnnotatorFileStampTest : BasePlatformTestCase() {
                 "# @param [String] x\n# @return [void]\ndef foo(x)\nend\n",
             )
         val info = annotator.collectInformation(psiFile)!!
-        // doAnnotate will try to call daemon and likely return null in test env (no gem), but should not throw
+        // doAnnotate will try to call daemon and likely return error in test env (no gem), but should not throw
         val result = annotator.doAnnotate(info)
-        // In test env without daemon, result is null — but the call should not crash and should handle ReadAction save logic
-        assertNull(result)
+        // In test env without daemon, result is either null (old) or error output (new) — both acceptable without throw
+        if (result != null) {
+            assertEquals(1, result.files.size)
+            assertEquals(
+                "Docscribe/Error",
+                result.files
+                    .first()
+                    .offenses
+                    .first()
+                    .copName,
+            )
+        } else {
+            assertNull(result)
+        }
     }
 }

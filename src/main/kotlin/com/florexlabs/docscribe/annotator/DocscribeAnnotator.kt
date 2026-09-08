@@ -209,18 +209,121 @@ class DocscribeAnnotator : ExternalAnnotator<AnnotatorFileInfo, DocscribeOutput>
         // Another check for same file started while this one was running — discard
         if (fileGeneration[filePath] != generation) return null
 
-        val output =
+        val output: DocscribeOutput? =
             when {
-                !result.success -> null
-                result.stdout.isBlank() -> DocscribeOutput(null, emptyList(), null)
-                else -> DocscribeOutputParser.parseJson(result.stdout)
+                !result.success -> {
+                    val stderrPrev = result.stderr.take(MAX_STDERR_PREVIEW)
+                    log.warn(
+                        "DocScribe doAnnotate failed for $filePath: " +
+                            "success=${result.success} exit=${result.exitCode} " +
+                            "stderr=$stderrPrev blank=${result.stdout.isBlank()}",
+                    )
+                    // Don't cache failures — let next annotate retry, and return a synthetic error output
+                    // so apply can show a visible error instead of 0
+                    val msg =
+                        result.stderr
+                            .ifBlank {
+                                "Docscribe failed (exit ${result.exitCode})"
+                            }.take(MAX_STDERR_PREVIEW)
+                    DocscribeOutput(
+                        metadata = null,
+                        files =
+                            listOf(
+                                com.florexlabs.docscribe.runner.ParsedFile(
+                                    path = filePath,
+                                    offenses =
+                                        listOf(
+                                            com.florexlabs.docscribe.runner.ParsedOffense(
+                                                severity = "error",
+                                                copName = "Docscribe/Error",
+                                                message = msg,
+                                                corrected = false,
+                                                correctable = false,
+                                                location =
+                                                    com.florexlabs.docscribe.runner
+                                                        .OffenseLocation(1, 1, 1, 1),
+                                            ),
+                                        ),
+                                ),
+                            ),
+                        summary = null,
+                    )
+                }
+
+                result.stdout.isBlank() -> {
+                    DocscribeOutput(null, emptyList(), null)
+                }
+
+                else -> {
+                    DocscribeOutputParser.parseJson(result.stdout)
+                }
             }
 
-        log.info("DocScribe doAnnotate parsed output files=${output?.files?.size} offenses=${output?.files?.firstOrNull()?.offenses?.size}")
-        if (output != null) {
-            cache.put(info.projectDir, filePath, info.fileStamp, effectiveHash, output)
+        // Handle case where docscribe reported error_count >0 but no files (e.g. parser error)
+        val hasErrorCount = (output?.summary?.errorCount ?: 0) > 0
+        val isEmptyWithError = hasErrorCount && output?.files?.isEmpty() == true
+        if (isEmptyWithError) {
+            log.warn("DocScribe doAnnotate error_count>0 but files empty for $filePath, treating as error")
         }
-        val ret = if (output == null || output.files.isEmpty()) null else output
+        // Don't cache emptyList when there was an actual error (e.g. !success case above is not cached anyway)
+        // For blank stdout with success, it's a legitimate "no offenses" file, cache it
+        val isErrorOutput = output?.files?.any { it.offenses.any { off -> off.copName == "Docscribe/Error" } } == true || isEmptyWithError
+        if (output != null && !isErrorOutput) {
+            cache.put(info.projectDir, filePath, info.fileStamp, effectiveHash, output)
+        } else if (isErrorOutput) {
+            log.warn("DocScribe doAnnotate not caching error output for $filePath")
+        }
+        log.info(
+            "DocScribe doAnnotate parsed output files=${output?.files?.size} " +
+                "offenses=${output?.files?.firstOrNull()?.offenses?.size} hasErrorCount=$hasErrorCount",
+        )
+        // Don't treat error output as empty — return it so apply can show the error
+        val ret =
+            when {
+                output == null -> {
+                    null
+                }
+
+                isErrorOutput -> {
+                    // If we have error_count but no files, create a synthetic error file for apply to show
+                    if (output.files.isEmpty() && hasErrorCount) {
+                        val msg = "Docscribe reported ${output.summary?.errorCount} error(s) for $filePath (check idea.log)"
+                        DocscribeOutput(
+                            metadata = output.metadata,
+                            files =
+                                listOf(
+                                    com.florexlabs.docscribe.runner.ParsedFile(
+                                        path = filePath,
+                                        offenses =
+                                            listOf(
+                                                com.florexlabs.docscribe.runner.ParsedOffense(
+                                                    severity = "error",
+                                                    copName = "Docscribe/Error",
+                                                    message = msg,
+                                                    corrected = false,
+                                                    correctable = false,
+                                                    location =
+                                                        com.florexlabs.docscribe.runner
+                                                            .OffenseLocation(1, 1, 1, 1),
+                                                ),
+                                            ),
+                                    ),
+                                ),
+                            summary = output.summary,
+                        )
+                    } else {
+                        output
+                    }
+                }
+
+                output.files.isEmpty() -> {
+                    null
+                }
+
+                else -> {
+                    output
+                }
+            }
         log.info("DocScribe doAnnotate returning ${if (ret == null) "null" else "${ret.files.size} files"}")
         return ret
     }
@@ -245,18 +348,20 @@ class DocscribeAnnotator : ExternalAnnotator<AnnotatorFileInfo, DocscribeOutput>
         val offenseCount = annotationResult?.files?.sumOf { it.offenses.size }
         log.info("DocScribe apply file=$filePath result=${annotationResult?.files?.size} offenses=$offenseCount")
         val document = PsiDocumentManager.getInstance(file.project).getDocument(file) ?: return
-        // 1. Daemon offenses (RBS mismatches, missing docs, invalid YARD)
+        // 1. Daemon offenses (RBS mismatches, missing docs, invalid YARD, errors)
         if (annotationResult != null) {
             for (parsedFile in annotationResult.files) {
                 for (offense in parsedFile.offenses) {
                     val isRbsTypeUpdate = offense.copName == "Docscribe/UpdatedParam" || offense.copName == "Docscribe/UpdatedReturn"
                     val isInvalidYard = offense.copName == "Docscribe/InvalidType"
+                    val isError = offense.copName == "Docscribe/Error"
                     val baseLine = (offense.location.startLine - 1).coerceIn(0, document.lineCount - 1)
-                    // For both RBS updates and invalid YARD, highlight the YARD comment, not the def
+                    // For RBS updates and invalid YARD, highlight the YARD comment, not the def. Errors stay on line 1.
                     val line =
                         when {
                             isRbsTypeUpdate -> findYardTagLine(document, baseLine, offense.copName) ?: baseLine
                             isInvalidYard -> findYardTagLine(document, baseLine, offense.copName, offense.message) ?: baseLine
+                            isError -> baseLine
                             else -> baseLine
                         }
                     val lineStart = document.getLineStartOffset(line)
@@ -271,17 +376,25 @@ class DocscribeAnnotator : ExternalAnnotator<AnnotatorFileInfo, DocscribeOutput>
                     // For RBS type mismatches, safe fix is no-op for existing @param,
                     // so offer update_types which does -AkB + -aB with rbs_collection.
                     // Keeps descriptions via -k. For invalid YARD, offer direct YARD fix.
-                    val fix =
-                        when {
-                            isRbsTypeUpdate -> DocscribeUpdateTypesIntention()
-                            isInvalidYard -> DocscribeInvalidYardTypeFixIntention(offense.message, line)
-                            else -> DocscribeFixIntention()
-                        }
-                    holder
-                        .newAnnotation(severity, offense.message)
-                        .range(range)
-                        .withFix(fix)
-                        .create()
+                    // For errors, don't offer a fix (just show the error).
+                    if (isError) {
+                        holder
+                            .newAnnotation(HighlightSeverity.ERROR, offense.message)
+                            .range(range)
+                            .create()
+                    } else {
+                        val fix =
+                            when {
+                                isRbsTypeUpdate -> DocscribeUpdateTypesIntention()
+                                isInvalidYard -> DocscribeInvalidYardTypeFixIntention(offense.message, line)
+                                else -> DocscribeFixIntention()
+                            }
+                        holder
+                            .newAnnotation(severity, offense.message)
+                            .range(range)
+                            .withFix(fix)
+                            .create()
+                    }
                 }
             }
         }
