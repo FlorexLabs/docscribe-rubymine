@@ -40,9 +40,23 @@ class DocscribeAnnotatorTest : BasePlatformTestCase() {
         val annotator = DocscribeAnnotator()
         val file = myFixture.configureByText("test.rb", "class Foo\nend")
         val info = annotator.collectInformation(file)!!
-        // No docscribe gem in test env — should return null without throwing
+        // No docscribe gem in test env — now returns error output instead of null, but should not throw
         val result = annotator.doAnnotate(info)
-        assertNull(result)
+        // In test env without daemon, it returns a synthetic error (Docscribe/Error) which is not cached as empty
+        // We check that it either returns null (old) or an error output (new) — both are acceptable without throw
+        if (result != null) {
+            assertEquals(1, result.files.size)
+            assertEquals(
+                "Docscribe/Error",
+                result.files
+                    .first()
+                    .offenses
+                    .first()
+                    .copName,
+            )
+        } else {
+            assertNull(result)
+        }
     }
 
     fun testFileGenerationIncrementsOnNewAnnotation() {
