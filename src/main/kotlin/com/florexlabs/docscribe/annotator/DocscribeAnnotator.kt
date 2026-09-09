@@ -381,8 +381,7 @@ class DocscribeAnnotator : ExternalAnnotator<AnnotatorFileInfo, DocscribeOutput>
                         }
                     // For RBS type mismatches, safe fix is no-op for existing @param,
                     // so offer update_types which does -AkB + -aB with rbs_collection.
-                    // Keeps descriptions via -k. For invalid YARD, offer direct YARD fix.
-                    // For errors, don't offer a fix (just show the error).
+                    // Keeps descriptions via -k. For errors, don't offer a fix.
                     if (isError) {
                         holder
                             .newAnnotation(HighlightSeverity.ERROR, offense.message)
@@ -392,7 +391,6 @@ class DocscribeAnnotator : ExternalAnnotator<AnnotatorFileInfo, DocscribeOutput>
                         val fix =
                             when {
                                 isRbsTypeUpdate -> DocscribeUpdateTypesIntention()
-                                isInvalidYard -> DocscribeInvalidYardTypeFixIntention(offense.message, line)
                                 else -> DocscribeFixIntention()
                             }
                         holder
