@@ -10,6 +10,7 @@ import com.intellij.notification.NotificationType
 import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
+import com.intellij.openapi.actionSystem.CommonDataKeys
 import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.progress.ProgressIndicator
 import com.intellij.openapi.progress.Task
@@ -39,6 +40,11 @@ class UpdateTypesAction : AnAction() {
             return
         }
 
+        val targetFile =
+            e.getData(CommonDataKeys.VIRTUAL_FILE)?.let { vf ->
+                if (vf.name.endsWith(".rb") || vf.name.endsWith(".rake") || vf.name == "Rakefile") vf.path else null
+            }
+
         object : Task.Backgroundable(project, "DocScribe: updating types from RBS...", false) {
             var exitCode = -1
             var stderrText = ""
@@ -47,6 +53,7 @@ class UpdateTypesAction : AnAction() {
                 val options =
                     RunOptions(
                         projectDir = projectRoot,
+                        file = targetFile,
                         subcommand = "update_types",
                     )
                 val result = DocscribeDaemon.executeWithFallback(project, options)
@@ -59,17 +66,19 @@ class UpdateTypesAction : AnAction() {
                 }
                 // Refresh VFS so the editor shows the updated YARD docs
                 try {
-                    val vFile = LocalFileSystem.getInstance().findFileByPath(projectRoot)
-                    vFile?.refresh(true, true)
-                } catch (_: Exception) {
-                }
-                // Also reload open documents
-                try {
-                    val mgr = FileDocumentManager.getInstance()
-                    for (file in com.intellij.openapi.fileEditor.FileEditorManager
-                        .getInstance(project)
-                        .openFiles) {
-                        mgr.reloadFiles(file)
+                    if (targetFile != null) {
+                        val vFile = LocalFileSystem.getInstance().findFileByPath(targetFile)
+                        vFile?.refresh(false, false)
+                        if (vFile != null) FileDocumentManager.getInstance().reloadFiles(vFile)
+                    } else {
+                        val vFile = LocalFileSystem.getInstance().findFileByPath(projectRoot)
+                        vFile?.refresh(true, true)
+                        val mgr = FileDocumentManager.getInstance()
+                        for (file in com.intellij.openapi.fileEditor.FileEditorManager
+                            .getInstance(project)
+                            .openFiles) {
+                            mgr.reloadFiles(file)
+                        }
                     }
                 } catch (_: Exception) {
                 }

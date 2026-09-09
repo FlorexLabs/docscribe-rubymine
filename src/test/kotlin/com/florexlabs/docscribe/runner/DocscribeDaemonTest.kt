@@ -187,6 +187,41 @@ class DocscribeDaemonTest {
     }
 
     @Test
+    fun `buildUpdateTypesParams includes file when provided`() {
+        val params = DocscribeDaemon.buildUpdateTypesParams("/tmp/myproject", "/tmp/myproject/app.rb")
+        assertEquals("/tmp/myproject", params["dir"])
+        assertEquals("/tmp/myproject/app.rb", params["file"])
+    }
+
+    @Test
+    fun `buildUpdateTypesParams omits file when null`() {
+        val params = DocscribeDaemon.buildUpdateTypesParams("/tmp/myproject", null)
+        assertEquals("/tmp/myproject", params["dir"])
+        assertFalse(params.containsKey("file"))
+    }
+
+    @Test
+    fun `buildUpdateTypesParams file overrides dir target for daemon`() {
+        val params = DocscribeDaemon.buildUpdateTypesParams("/proj", "/proj/lib/foo.rb")
+        assertEquals("/proj/lib/foo.rb", params["file"])
+    }
+
+    @Test
+    fun `check json preserves source from change`() {
+        val changes = listOf(mapOf("line" to 5, "type" to "updated_param", "message" to "msg", "source" to "rbs"))
+        val json = DocscribeDaemon.buildCheckJson("a.rb", changes)
+        assertTrue(json.contains("\"source\":\"rbs\""))
+        assertTrue(json.contains("UpdatedParam"))
+    }
+
+    @Test
+    fun `check json without source omits source field`() {
+        val changes = listOf(mapOf("line" to 5, "type" to "missing_param"))
+        val json = DocscribeDaemon.buildCheckJson("a.rb", changes)
+        assertFalse(json.contains("\"source\""))
+    }
+
+    @Test
     fun `buildUpdateTypesParams includes rbs cli_overrides when sig exists`() {
         val dir = Files.createTempDirectory("rbs-update-types").toFile()
         try {

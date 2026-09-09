@@ -262,11 +262,8 @@ object DocscribeRunner {
             }
         val args =
             if (options.subcommand != null) {
-                // For update_types, the gem's cli/update_types handles --rbs/--rbs-collection internally,
-                // but --validate-types should still be passed as an extra arg if needed
-                // update_types handles validate-types via config, no extra CLI flag needed
-                val base = mutableListOf(options.subcommand, projectRoot)
-                base
+                val target = options.file ?: projectRoot
+                mutableListOf(options.subcommand, target)
             } else {
                 getCommandArgs(
                     options.strategy,

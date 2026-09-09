@@ -356,17 +356,20 @@ class DocscribeAnnotator : ExternalAnnotator<AnnotatorFileInfo, DocscribeOutput>
         val document = PsiDocumentManager.getInstance(file.project).getDocument(file) ?: return
         // 1. Daemon offenses (RBS mismatches, missing docs, invalid YARD, errors)
         if (annotationResult != null) {
+            val projectDir = file.project.basePath ?: ""
+            val useRbs = RbsDetector.shouldUseRbs(projectDir)
             for (parsedFile in annotationResult.files) {
                 for (offense in parsedFile.offenses) {
-                    val isRbsTypeUpdate = offense.copName == "Docscribe/UpdatedParam" || offense.copName == "Docscribe/UpdatedReturn"
-                    val isInvalidYard = offense.copName == "Docscribe/InvalidType"
+                    val isRbsTypeUpdateRaw = offense.copName == "Docscribe/UpdatedParam" || offense.copName == "Docscribe/UpdatedReturn"
+                    val isInvalidYardRaw = offense.copName == "Docscribe/InvalidType"
                     val isError = offense.copName == "Docscribe/Error"
+                    val isRbsSource = offense.source == "rbs" || offense.message.contains("RBS")
                     val baseLine = (offense.location.startLine - 1).coerceIn(0, document.lineCount - 1)
                     // For RBS updates and invalid YARD, highlight the YARD comment, not the def. Errors stay on line 1.
                     val line =
                         when {
-                            isRbsTypeUpdate -> findYardTagLine(document, baseLine, offense.copName) ?: baseLine
-                            isInvalidYard -> findYardTagLine(document, baseLine, offense.copName, offense.message) ?: baseLine
+                            isRbsTypeUpdateRaw -> findYardTagLine(document, baseLine, offense.copName) ?: baseLine
+                            isInvalidYardRaw -> findYardTagLine(document, baseLine, offense.copName, offense.message) ?: baseLine
                             isError -> baseLine
                             else -> baseLine
                         }
@@ -381,7 +384,8 @@ class DocscribeAnnotator : ExternalAnnotator<AnnotatorFileInfo, DocscribeOutput>
                         }
                     // For RBS type mismatches, safe fix is no-op for existing @param,
                     // so offer update_types which does -AkB + -aB with rbs_collection.
-                    // Keeps descriptions via -k. For errors, don't offer a fix.
+                    // Keeps descriptions via -k. For invalid YARD, offer direct YARD fix.
+                    // For errors, don't offer a fix (just show the error).
                     if (isError) {
                         holder
                             .newAnnotation(HighlightSeverity.ERROR, offense.message)
@@ -390,7 +394,10 @@ class DocscribeAnnotator : ExternalAnnotator<AnnotatorFileInfo, DocscribeOutput>
                     } else {
                         val fix =
                             when {
-                                isRbsTypeUpdate -> DocscribeUpdateTypesIntention()
+                                isRbsTypeUpdateRaw && useRbs -> DocscribeUpdateTypesIntention()
+                                isRbsTypeUpdateRaw && !useRbs -> DocscribeFixIntention()
+                                isInvalidYardRaw && useRbs && isRbsSource -> DocscribeUpdateTypesIntention()
+                                isInvalidYardRaw -> DocscribeFixIntention()
                                 else -> DocscribeFixIntention()
                             }
                         holder
