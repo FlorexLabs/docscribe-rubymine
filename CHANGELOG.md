@@ -4,19 +4,49 @@
 
 ### Added
 
-- **RBS-aware inspections** — `Check Current File`, `Safe Fix`, `Aggressive Fix` and `Check Entire Workspace` now auto-detect RBS via `sig/*.rbs`, `Gemfile.lock` / `Gemfile` or explicit `docscribe.yml` `rbs.enabled` and forward `--rbs` / `--rbs-collection` to both daemon (`cli_overrides`) and CLI fallback. New `RbsDetector` with `rbsHash` for cache invalidation.
-- **Doctor RBS status** — `DocScribe Doctor` now shows `RBS: sig/`, `rbs gem`, `rbs_collection.lock.yaml` and `rbs.enabled` (via `RbsDetector.shouldUseRbs`).
-- **Annotator cache invalidation on RBS changes** — `DocscribeAnnotator.configHash` now includes `RbsDetector.rbsHash(projectDir)` (+ `hideCommentsByDefault`), so editing `sig/*.rbs` without touching Ruby files correctly invalidates the cache.
-- **MCP API for testing** — new `DocScribeMcpToolset` (`com.intellij.mcpserver.McpToolset`) exposing 6 tools `docscribe_check_file`, `docscribe_check_workspace`, `docscribe_safe_fix`, `docscribe_aggressive_fix`, `docscribe_update_types`, `docscribe_doctor` via JetBrains MCP (`stream`/`sse`/`stdio` on `http://127.0.0.1:64502`). Registered in `withMcpServer.xml` (`com.intellij.mcpServer` optional).
-- **i18n** — English and Russian localizations for actions and settings via `messages.DocScribeBundle` (`DocScribeBundle.properties` + `DocScribeBundle_ru.properties`) and `<resource-bundle>messages.DocScribeBundle</resource-bundle>` in `plugin.xml`.
+- **RBS-aware inspections** — `Check Current File`, `Safe Fix`, `Aggressive Fix` and `Check Entire Workspace` now
+  auto-detect RBS via `sig/*.rbs`, `Gemfile.lock` / `Gemfile` or explicit `docscribe.yml` `rbs.enabled` and forward
+  `--rbs` / `--rbs-collection` to both daemon (`cli_overrides`) and CLI fallback. New `RbsDetector` with `rbsHash` for
+  cache invalidation.
+- **Doctor RBS status** — `DocScribe Doctor` now shows `RBS: sig/`, `rbs gem`, `rbs_collection.lock.yaml` and
+  `rbs.enabled` (via `RbsDetector.shouldUseRbs`).
+- **Annotator cache invalidation on RBS changes** — `DocscribeAnnotator.configHash` now includes
+  `RbsDetector.rbsHash(projectDir)` (+ `hideCommentsByDefault`), so editing `sig/*.rbs` without touching Ruby files
+  correctly invalidates the cache.
+- **MCP API for testing** — new `DocScribeMcpToolset` (`com.intellij.mcpserver.McpToolset`) exposing 6 tools
+  `docscribe_check_file`, `docscribe_check_workspace`, `docscribe_safe_fix`, `docscribe_aggressive_fix`,
+  `docscribe_update_types`, `docscribe_doctor` via JetBrains MCP (`stream`/`sse`/`stdio` on `http://127.0.0.1:64502`).
+  Registered in `withMcpServer.xml` (`com.intellij.mcpServer` optional).
+- **Invalid YARD type validation** — new `warnOnInvalidYardTypes` setting + checkbox, forwards `--validate-types` to
+  daemon (`cli_overrides`) and CLI fallback. `InvalidType` offense underlines YARD type line with direct fix.
+- **File-scoped Update Types** — `RunOptions` gains `file` param, daemon `update_types` sends `{dir,file}` for
+  single-file sync.
+- **Source field routing** — `ParsedOffense.source` (`rbs|infer|syntax`) routes annotation text and fix strategy.
+- **Error display** — gem-missing / config errors show `BALLOON` `WARNING` with `Add to Gemfile` action instead of red
+  squiggle, fatal stays `ERROR`.
+- **i18n** — English and Russian localizations for actions and settings via `messages.DocScribeBundle`
+  (`DocScribeBundle.properties` + `DocScribeBundle_ru.properties`) and
+  `<resource-bundle>messages.DocScribeBundle</resource-bundle>` in `plugin.xml`.
 
 ### Fixed
 
-- **Update Types from RBS via daemon** — `DocscribeDaemon` now sends `dir` + `cli_overrides` for `update_types` RPC and falls back to CLI on `Unknown method: update_types` (`-32601`) for old daemons (< 1.6.2). Fixed `performRpcCall` to forward `params` for `update_types`.
-- **Companion object warning** — `DocscribeAnnotator` `fileGeneration` map now suppressed with `// noinspection CompanionObjectInExtension` + `@Suppress("CompanionObjectInExtension")` (IDE inspection `Companion objects in IDE extensions may only contain a logger and constants`).
+- **RBS underline YARD line** — RBS-inferred offenses underline YARD type line, not `def` line.
+- **Safe fix UX** — safe fix reports applied count and refreshes annotations without stale squiggles.
+- **Update Types exit 1 + daemon fallback** — `update_types` treats exit `1` as success-with-changes and falls back to
+  CLI on daemon error.
+- **Doctor stale cache** — `DocScribe Doctor` clears cached gem check before re-probing version and daemon state.
+- **MCP not loading** — fixed `McpToolset` registration so `docscribe_*` tools load via JetBrains MCP.
+- **collectRubyFiles synced with CLI filter** — `collectRubyFiles` matches CLI filter (`27 vs 32` mismatch fixed).
+- **Update Types from RBS via daemon** — `DocscribeDaemon` now sends `dir` + `cli_overrides` for `update_types` RPC and
+  falls back to CLI on `Unknown method: update_types` (`-32601`) for old daemons (< 1.6.2). Fixed `performRpcCall` to
+  forward `params` for `update_types`.
+- **Companion object warning** — `DocscribeAnnotator` `fileGeneration` map now suppressed with
+  `// noinspection CompanionObjectInExtension` + `@Suppress("CompanionObjectInExtension")` (IDE inspection
+  `Companion objects in IDE extensions may only contain a logger and constants`).
 
 ### Changed
 
+- **Requires docscribe >= 1.6.2** — new API (`--validate-types`, `source`, file-scoped `update_types`).
 - **Version** bumped from `0.1.6` to `0.1.7`.
 
 ## [0.1.6] — 2026-08-16

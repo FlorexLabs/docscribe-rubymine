@@ -19,6 +19,52 @@
     ]]></description>
 
   <change-notes><![CDATA[
+        <h3>0.1.7</h3>
+        <h4>Added</h4>
+        <ul>
+            <li>RBS-aware inspections — check, safe/aggressive fix and workspace check auto-detect RBS via <code>RbsDetector</code> and forward <code>--rbs</code> / <code>--rbs-collection</code> via <code>cli_overrides</code></li>
+            <li>Doctor RBS status — <code>DocScribe Doctor</code> shows <code>sig/</code>, <code>rbs</code> gem, <code>rbs_collection.lock.yaml</code> and <code>rbs.enabled</code></li>
+            <li>Annotator cache invalidation on RBS changes — <code>configHash</code> includes <code>rbsHash</code></li>
+            <li>MCP API — <code>DocScribeMcpToolset</code> exposing 6 tools (<code>docscribe_check_file</code>, <code>docscribe_check_workspace</code>, <code>docscribe_safe_fix</code>, <code>docscribe_aggressive_fix</code>, <code>docscribe_update_types</code>, <code>docscribe_doctor</code>)</li>
+            <li>i18n — English and Russian localizations via <code>DocScribeBundle</code></li>
+            <li>Invalid YARD type validation — <code>warnOnInvalidYardTypes</code> setting forwarded as <code>--validate-types</code></li>
+            <li>File-scoped Update Types — refresh YARD docs from RBS signatures for current file</li>
+            <li>Fix routing by source — <code>rbs</code> | <code>infer</code> | <code>syntax</code></li>
+        </ul>
+        <h4>Fixed</h4>
+        <ul>
+            <li>RBS mismatch underlines YARD line, not <code>def</code></li>
+            <li>Safe fix UX for RBS — routes through aggressive fix</li>
+            <li><code>update_types</code> exit code <code>1</code> and daemon fallback on <code>-32601</code> for old daemons</li>
+            <li>Doctor stale version cache — invalidated on <code>Gemfile.lock</code> mtime</li>
+            <li>MCP toolset not loading — registered via <code>withMcpServer.xml</code></li>
+            <li>Errors shown as balloon with &ldquo;Add to Gemfile&rdquo; instead of red squiggle</li>
+            <li><code>collectRubyFiles</code> synced with CLI filter</li>
+        </ul>
+        <h4>Changed</h4>
+        <ul>
+            <li>Version bumped from <code>0.1.6</code> to <code>0.1.7</code></li>
+            <li>Requires <code>docscribe &gt;= 1.6.2</code> for new API</li>
+        </ul>
+        <h3>0.1.6</h3>
+        <h4>Added</h4>
+        <ul>
+            <li>Batch workspace check — all <code>.rb</code> / <code>.rake</code> / <code>Rakefile</code> files sent in one <code>check_batch</code> RPC call</li>
+            <li><code>check_batch</code> RPC support in <code>DocscribeDaemon</code> — per-file errors reported independently, requires <code>docscribe &gt;= 1.5.2</code></li>
+            <li>Batch capability detection — <code>batchMode</code> for version <code>&gt;= 1.5.2</code> alongside <code>serverMode</code></li>
+        </ul>
+        <h4>Changed</h4>
+        <ul>
+            <li>Version bumped from <code>0.1.5</code> to <code>0.1.6</code></li>
+            <li>Workspace check runs in chunks of 10 with progress and cancellation support</li>
+            <li>Target IDE widened to 2026.1 — 2026.2</li>
+            <li>Notification group registration hardened — registry fallback</li>
+        </ul>
+        <h4>Fixed</h4>
+        <ul>
+            <li>Workspace check silently no-ops in server mode — now enumerates files and uses batch endpoint</li>
+            <li>Gem check used system Ruby instead of module SDK bundle path — now runs SDK <code>bundle</code> by absolute path</li>
+        </ul>
         <h3>0.1.5</h3>
         <h4>Added</h4>
         <ul>

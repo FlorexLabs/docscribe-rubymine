@@ -27,7 +27,8 @@
 
 **DocScribe** is a RubyMine plugin that auto-generates inline YARD documentation for Ruby methods
 using [docscribe](https://github.com/unurgunite/docscribe) — a Ruby gem that analyzes AST and suggests YARD-compatible
-documentation. Compatible with **docscribe >= 1.4.0** (daemon mode requires >= 1.5.1).
+documentation. Compatible with **docscribe >= 1.4.0** (daemon mode requires >= 1.5.1; validate-types, source routing and
+file-scoped update require >= 1.6.2).
 
 > Also, available for [VS Code](https://github.com/FlorexLabs/docscribe-vscode) on
 > the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=FlorexLabs.docscribe).
@@ -58,6 +59,9 @@ documentation. Compatible with **docscribe >= 1.4.0** (daemon mode requires >= 1
 - **Flexible strategies** — safe (document missing methods only) and aggressive (replace existing docs, preserve manual
   descriptions)
 - **Update types from RBS** — refresh YARD docs from RBS signatures
+- **Invalid YARD type validation** — highlights malformed YARD types like `Sym bol` even without RBS (toggle in
+  settings)
+- **File-scoped Update Types** — intention fixes current file only
 - **Collapsible YARD docs** — fold all YARD comment blocks automatically on file open (configurable in settings)
 - **Configurable** — hide comments by default
 - **`.rake` and `Rakefile` support** — diagnostics and actions work on Rake files and bare Rakefiles
@@ -72,10 +76,11 @@ documentation. Compatible with **docscribe >= 1.4.0** (daemon mode requires >= 1
 
 ### Version compatibility
 
-| Mode                     | docscribe version | Ruby version |
-|--------------------------|-------------------|--------------|
-| Daemon (Unix socket RPC) | >= 1.5.1          | >= 3.0       |
-| CLI fallback             | >= 1.4.0          | >= 2.7       |
+| Mode                                  | docscribe version | Ruby version |
+|---------------------------------------|-------------------|--------------|
+| Daemon (Unix socket RPC)              | >= 1.5.1          | >= 3.0       |
+| CLI fallback                          | >= 1.4.0          | >= 2.7       |
+| Validate-types / source / file-scoped | >= 1.6.2          | >= 2.7       |
 
 The plugin automatically selects the backend based on the detected docscribe version: daemon mode for >= 1.5.1, CLI
 fallback for older versions. If the Ruby SDK is unavailable, it falls back to system PATH Ruby.
@@ -140,18 +145,25 @@ All actions are available in the editor right-click menu under the **DocScribe**
 Open a Ruby file — undocumented methods are underlined with a warning. Hover to see what's missing. Diagnostics update
 automatically on file save and open.
 
+Invalid `InvalidType` warnings highlight the YARD line (`# @param` / `# @return`), not the `def` line. Fatal errors stay
+red ERROR.
+
 ### Quick-Fix
 
 Click the lightbulb or press `Alt+Enter` on an annotated diagnostic and select **"Apply docscribe fix"** to
 auto-generate documentation for that method.
 
+If the gem is not installed, the plugin shows a BALLOON WARNING with an Add to Gemfile button (writes
+`gem "docscribe"` to the Gemfile root) instead of a red squiggle.
+
 ### Settings
 
 Navigate to **Settings -> Tools -> DocScribe**:
 
-| Setting                  | Description                                | Default |
-|--------------------------|--------------------------------------------|---------|
-| Hide comments by default | Auto-fold YARD comment blocks on file open | Off     |
+| Setting                    | Description                                     | Default |
+|----------------------------|-------------------------------------------------|---------|
+| Hide comments by default   | Auto-fold YARD comment blocks on file open      | Off     |
+| Warn on invalid YARD types | Highlight malformed YARD types even without RBS | On      |
 
 ## Development
 
