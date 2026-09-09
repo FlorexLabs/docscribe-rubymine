@@ -218,8 +218,14 @@ class DocscribeAnnotator : ExternalAnnotator<AnnotatorFileInfo, DocscribeOutput>
                             "success=${result.success} exit=${result.exitCode} " +
                             "stderr=$stderrPrev blank=${result.stdout.isBlank()}",
                     )
-                    // Don't cache failures — let next annotate retry, and return a synthetic error output
-                    // so apply can show a visible error instead of 0
+                    // For gem not installed, show a balloon with Add action, not a red squiggle
+                    // This matches RuboCop's UX: balloon with "Add to Gemfile" button
+                    if (result.stderr.contains("docscribe gem is not installed", ignoreCase = true)) {
+                        showGemNotInstalledBalloon(info.project, info.projectDir)
+                        return null
+                    }
+                    // For other failures (fatal syntax etc.), return a synthetic error output
+                    // so apply can show a visible error instead of 0. Don't cache failures.
                     val msg =
                         result.stderr
                             .ifBlank {
@@ -400,6 +406,63 @@ class DocscribeAnnotator : ExternalAnnotator<AnnotatorFileInfo, DocscribeOutput>
         }
         // YARD syntax validation without RBS is now handled by the gem via --validate-types
         // (Yard::Validator + TypeMismatchValidator) and appears as Docscribe/InvalidType above
+    }
+
+    private fun showGemNotInstalledBalloon(
+        project: Project,
+        projectDir: String,
+    ) {
+        try {
+            val group =
+                com.intellij.notification.NotificationGroupManager
+                    .getInstance()
+                    .getNotificationGroup("DocScribe") ?: return
+            val notification =
+                group.createNotification(
+                    "Docscribe gem not found in this project. Add 'gem \"docscribe\"' to Gemfile to enable YARD checks.",
+                    com.intellij.notification.NotificationType.WARNING,
+                )
+            notification.addAction(
+                object : com.intellij.openapi.actionSystem.AnAction("Add to Gemfile") {
+                    override fun actionPerformed(e: com.intellij.openapi.actionSystem.AnActionEvent) {
+                        val gemFile = java.io.File(projectDir, "Gemfile")
+                        try {
+                            if (!gemFile.exists()) {
+                                gemFile.writeText("source \"https://rubygems.org\"\n\ngem \"docscribe\"\n")
+                            } else {
+                                val content = gemFile.readText()
+                                if (!content.contains("gem \"docscribe\"") && !content.contains("gem 'docscribe'")) {
+                                    gemFile.appendText("\ngem \"docscribe\"\n")
+                                }
+                            }
+                            val vFile =
+                                com.intellij.openapi.vfs.LocalFileSystem
+                                    .getInstance()
+                                    .refreshAndFindFileByIoFile(gemFile)
+                            if (vFile != null) {
+                                com.intellij.openapi.fileEditor.FileEditorManager
+                                    .getInstance(project)
+                                    .openFile(vFile, true)
+                            }
+                            group
+                                .createNotification(
+                                    "Added gem \"docscribe\" to Gemfile — run 'bundle install'",
+                                    com.intellij.notification.NotificationType.INFORMATION,
+                                ).notify(project)
+                        } catch (_: Exception) {
+                            group
+                                .createNotification(
+                                    "Failed to update Gemfile",
+                                    com.intellij.notification.NotificationType.ERROR,
+                                ).notify(project)
+                        }
+                        notification.expire()
+                    }
+                },
+            )
+            notification.notify(project)
+        } catch (_: Exception) {
+        }
     }
 
     private fun findYardTagLine(
