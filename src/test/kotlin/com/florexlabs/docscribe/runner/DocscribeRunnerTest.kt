@@ -94,6 +94,29 @@ class DocscribeRunnerTest {
     }
 
     @Test
+    fun `runDocscribe with update_types and file uses file as target`() {
+        val executor = RecordingExecutor()
+        DocscribeRunner.runDocscribe(
+            RunOptions(projectDir = "/project", file = "/project/app.rb", subcommand = "update_types"),
+            executor,
+        )
+        assertEquals("bundle", executor.lastCommand)
+        assertEquals(listOf("exec", "docscribe", "update_types", "/project/app.rb"), executor.lastArgs)
+        assertEquals("/project", executor.lastCwd)
+    }
+
+    @Test
+    fun `runDocscribe with update_types without file uses projectDir`() {
+        val executor = RecordingExecutor()
+        DocscribeRunner.runDocscribe(
+            RunOptions(projectDir = "/project", file = null, subcommand = "update_types"),
+            executor,
+        )
+        assertEquals(listOf("exec", "docscribe", "update_types", "/project"), executor.lastArgs)
+        assertEquals("/project", executor.lastCwd)
+    }
+
+    @Test
     fun `runDocscribe defaults to DefaultCommandExecutor does not throw`() {
         val tempDir = createTempDirectory().toFile()
         try {

@@ -11,7 +11,6 @@ import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.progress.ProgressIndicator
 import com.intellij.openapi.progress.Task
 import com.intellij.openapi.project.Project
-import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.psi.PsiFile
 
 /**
@@ -48,13 +47,13 @@ class DocscribeUpdateTypesIntention : IntentionAction {
             var exitCode = -1
 
             override fun run(indicator: ProgressIndicator) {
-                val options = RunOptions(projectDir = projectRoot, subcommand = "update_types")
+                val options = RunOptions(projectDir = projectRoot, file = vFile.path, subcommand = "update_types")
                 val result = DocscribeDaemon.executeWithFallback(project, options)
                 failed = result.exitCode != 0
                 exitCode = result.exitCode
                 try {
-                    val dirVFile = LocalFileSystem.getInstance().findFileByPath(projectRoot)
-                    dirVFile?.refresh(true, true)
+                    vFile.refresh(false, false)
+                    FileDocumentManager.getInstance().reloadFiles(vFile)
                 } catch (_: Exception) {
                 }
             }

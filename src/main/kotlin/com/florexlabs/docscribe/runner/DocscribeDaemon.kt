@@ -166,7 +166,7 @@ class DocscribeDaemon(
         formatJson: Boolean = false,
     ): RunResult {
         val handle = synchronized(lock) { ensureRunning(projectDir) } ?: return fallback(command, file, projectDir, formatJson)
-        val params = if (command == "update_types") buildUpdateTypesParams(projectDir) else buildExecuteParams(file, projectDir)
+        val params = if (command == "update_types") buildUpdateTypesParams(projectDir, file) else buildExecuteParams(file, projectDir)
         val response = performRpcCall(handle, command, params)
         // Fallback for older daemons that don't support update_types (< 1.6.2)
         if (command == "update_types" && isUnknownMethodError(response)) {
@@ -180,9 +180,12 @@ class DocscribeDaemon(
     internal fun isUnknownMethodError(response: Map<String, Any?>?): Boolean = Companion.isUnknownMethodError(response)
 
     @VisibleForTesting
-    internal fun buildUpdateTypesParams(projectDir: String?): Map<String, Any?> {
+    internal fun buildUpdateTypesParams(
+        projectDir: String?,
+        file: String? = null,
+    ): Map<String, Any?> {
         val dir = projectDir ?: project.basePath ?: "."
-        return Companion.buildUpdateTypesParams(dir)
+        return Companion.buildUpdateTypesParams(dir, file)
     }
 
     /**
@@ -986,8 +989,12 @@ class DocscribeDaemon(
         }
 
         @VisibleForTesting
-        internal fun buildUpdateTypesParams(projectDir: String): Map<String, Any?> {
+        internal fun buildUpdateTypesParams(
+            projectDir: String,
+            file: String? = null,
+        ): Map<String, Any?> {
             val map = mutableMapOf<String, Any?>("dir" to projectDir)
+            if (file != null) map["file"] = file
             val cliOverrides = buildRbsCliOverridesStatic(projectDir)
             if (cliOverrides != null) map["cli_overrides"] = cliOverrides
             return map
@@ -1153,6 +1160,7 @@ class DocscribeDaemon(
                     val line = (change["line"] as? Number)?.toInt() ?: 1
                     val type = change["type"]?.toString() ?: ""
                     val rawMessage = change["message"]?.toString()
+                    val source = change["source"]?.toString()
                     val (copName, severity, message) =
                         when (type) {
                             "updated_param" -> {
@@ -1171,20 +1179,23 @@ class DocscribeDaemon(
                                 Triple("DocScribe/MissingDocumentation", "convention", rawMessage ?: "Missing YARD documentation")
                             }
                         }
-                    mapOf(
-                        "severity" to severity,
-                        "cop_name" to copName,
-                        "message" to message,
-                        "corrected" to false,
-                        "correctable" to true,
-                        "location" to
-                            mapOf(
-                                "start_line" to line,
-                                "start_column" to 1,
-                                "last_line" to line,
-                                "last_column" to 1,
-                            ),
-                    )
+                    val offense =
+                        mutableMapOf<String, Any>(
+                            "severity" to severity,
+                            "cop_name" to copName,
+                            "message" to message,
+                            "corrected" to false,
+                            "correctable" to true,
+                            "location" to
+                                mapOf(
+                                    "start_line" to line,
+                                    "start_column" to 1,
+                                    "last_line" to line,
+                                    "last_column" to 1,
+                                ),
+                        )
+                    if (source != null) offense["source"] = source
+                    offense
                 } else {
                     null
                 }
