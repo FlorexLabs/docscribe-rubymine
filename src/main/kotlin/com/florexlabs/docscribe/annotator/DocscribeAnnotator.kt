@@ -397,7 +397,7 @@ class DocscribeAnnotator : ExternalAnnotator<AnnotatorFileInfo, DocscribeOutput>
                                 isRbsTypeUpdateRaw && useRbs -> DocscribeUpdateTypesIntention()
                                 isRbsTypeUpdateRaw && !useRbs -> DocscribeFixIntention()
                                 isInvalidYardRaw && useRbs && isRbsSource -> DocscribeUpdateTypesIntention()
-                                isInvalidYardRaw -> DocscribeInvalidYardTypeFixIntention(offense.message, line)
+                                isInvalidYardRaw -> DocscribeFixIntention()
                                 else -> DocscribeFixIntention()
                             }
                         holder
