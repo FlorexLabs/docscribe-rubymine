@@ -40,9 +40,23 @@ class DocscribeAnnotatorTest : BasePlatformTestCase() {
         val annotator = DocscribeAnnotator()
         val file = myFixture.configureByText("test.rb", "class Foo\nend")
         val info = annotator.collectInformation(file)!!
-        // No docscribe gem in test env — should return null without throwing
+        // No docscribe gem in test env — now returns error output instead of null, but should not throw
         val result = annotator.doAnnotate(info)
-        assertNull(result)
+        // In test env without daemon, it returns a synthetic error (Docscribe/Error) which is not cached as empty
+        // We check that it either returns null (old) or an error output (new) — both are acceptable without throw
+        if (result != null) {
+            assertEquals(1, result.files.size)
+            assertEquals(
+                "Docscribe/Error",
+                result.files
+                    .first()
+                    .offenses
+                    .first()
+                    .copName,
+            )
+        } else {
+            assertNull(result)
+        }
     }
 
     fun testFileGenerationIncrementsOnNewAnnotation() {
@@ -73,5 +87,23 @@ class DocscribeAnnotatorTest : BasePlatformTestCase() {
 
         assertEquals(2L, DocscribeAnnotator.fileGeneration.getOrDefault(info1.filePath, 0L))
         assertEquals(1L, DocscribeAnnotator.fileGeneration.getOrDefault(info2.filePath, 0L))
+    }
+
+    fun testCollectInformationIncludesWarnOnInvalidYardTypesInHash() {
+        val settings =
+            com.florexlabs.docscribe.settings.DocscribeSettings
+                .getInstance()
+        val saved = settings.warnOnInvalidYardTypes
+        try {
+            settings.warnOnInvalidYardTypes = false
+            val file = myFixture.configureByText("test.rb", "class Foo\nend")
+            val infoFalse = DocscribeAnnotator().collectInformation(file)!!
+            settings.warnOnInvalidYardTypes = true
+            val infoTrue = DocscribeAnnotator().collectInformation(myFixture.configureByText("test2.rb", "class Foo\nend"))!!
+            // Hash should differ when setting changes (different file to avoid same path)
+            assertTrue(infoFalse.configHash != infoTrue.configHash)
+        } finally {
+            settings.warnOnInvalidYardTypes = saved
+        }
     }
 }

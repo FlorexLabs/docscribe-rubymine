@@ -6,6 +6,31 @@ import java.io.File
 import kotlin.io.path.createTempDirectory
 
 class DocscribeRunnerTest {
+    private var savedWarnOnInvalidYardTypes: Boolean? = null
+
+    @org.junit.Before
+    fun setUp() {
+        try {
+            val settings =
+                com.florexlabs.docscribe.settings.DocscribeSettings
+                    .getInstance()
+            savedWarnOnInvalidYardTypes = settings.warnOnInvalidYardTypes
+            settings.warnOnInvalidYardTypes = false
+        } catch (_: Exception) {
+        }
+    }
+
+    @org.junit.After
+    fun tearDown() {
+        try {
+            val settings =
+                com.florexlabs.docscribe.settings.DocscribeSettings
+                    .getInstance()
+            savedWarnOnInvalidYardTypes?.let { settings.warnOnInvalidYardTypes = it }
+        } catch (_: Exception) {
+        }
+    }
+
     private class RecordingExecutor : CommandExecutor {
         var lastCommand: String? = null
         var lastArgs: List<String>? = null
@@ -66,6 +91,29 @@ class DocscribeRunnerTest {
         )
         assertEquals("bundle", executor.lastCommand)
         assertEquals(listOf("exec", "docscribe", "update_types", "/project"), executor.lastArgs)
+    }
+
+    @Test
+    fun `runDocscribe with update_types and file uses file as target`() {
+        val executor = RecordingExecutor()
+        DocscribeRunner.runDocscribe(
+            RunOptions(projectDir = "/project", file = "/project/app.rb", subcommand = "update_types"),
+            executor,
+        )
+        assertEquals("bundle", executor.lastCommand)
+        assertEquals(listOf("exec", "docscribe", "update_types", "/project/app.rb"), executor.lastArgs)
+        assertEquals("/project", executor.lastCwd)
+    }
+
+    @Test
+    fun `runDocscribe with update_types without file uses projectDir`() {
+        val executor = RecordingExecutor()
+        DocscribeRunner.runDocscribe(
+            RunOptions(projectDir = "/project", file = null, subcommand = "update_types"),
+            executor,
+        )
+        assertEquals(listOf("exec", "docscribe", "update_types", "/project"), executor.lastArgs)
+        assertEquals("/project", executor.lastCwd)
     }
 
     @Test

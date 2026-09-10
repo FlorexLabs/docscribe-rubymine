@@ -14,6 +14,8 @@ import javax.swing.JPanel
  */
 class DocscribeSettingsConfigurable : Configurable {
     @JvmField var hideCommentsCheckBox = JBCheckBox("Hide comments by default")
+
+    @JvmField var warnInvalidYardCheckBox = JBCheckBox("Warn on invalid YARD types (even without RBS)")
     private var panel: JPanel? = null
 
     /**
@@ -27,10 +29,14 @@ class DocscribeSettingsConfigurable : Configurable {
     override fun createComponent(): JComponent {
         val settings = DocscribeSettings.getInstance()
         hideCommentsCheckBox.isSelected = settings.hideCommentsByDefault
+        warnInvalidYardCheckBox.isSelected = settings.warnOnInvalidYardTypes
+        warnInvalidYardCheckBox.toolTipText =
+            "Highlight YARD types with syntax errors like [Symb\u043aol] or [Array<] even when no RBS signature exists"
         panel =
             FormBuilder
                 .createFormBuilder()
                 .addComponent(hideCommentsCheckBox)
+                .addComponent(warnInvalidYardCheckBox)
                 .addComponentFillVertically(JPanel(), 0)
                 .panel
         return panel!!
@@ -41,7 +47,8 @@ class DocscribeSettingsConfigurable : Configurable {
      */
     override fun isModified(): Boolean {
         val s = DocscribeSettings.getInstance()
-        return hideCommentsCheckBox.isSelected != s.hideCommentsByDefault
+        return hideCommentsCheckBox.isSelected != s.hideCommentsByDefault ||
+            warnInvalidYardCheckBox.isSelected != s.warnOnInvalidYardTypes
     }
 
     /**
@@ -50,6 +57,7 @@ class DocscribeSettingsConfigurable : Configurable {
     override fun apply() {
         val s = DocscribeSettings.getInstance()
         s.hideCommentsByDefault = hideCommentsCheckBox.isSelected
+        s.warnOnInvalidYardTypes = warnInvalidYardCheckBox.isSelected
         ApplicationManager
             .getApplication()
             .messageBus
@@ -63,5 +71,6 @@ class DocscribeSettingsConfigurable : Configurable {
     override fun reset() {
         val s = DocscribeSettings.getInstance()
         hideCommentsCheckBox.isSelected = s.hideCommentsByDefault
+        warnInvalidYardCheckBox.isSelected = s.warnOnInvalidYardTypes
     }
 }
