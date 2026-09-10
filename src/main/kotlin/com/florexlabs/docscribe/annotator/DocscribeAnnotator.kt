@@ -417,6 +417,9 @@ class DocscribeAnnotator : ExternalAnnotator<AnnotatorFileInfo, DocscribeOutput>
         project: Project,
         projectDir: String,
     ) {
+        val now = System.currentTimeMillis()
+        if (!shouldShowGemBalloon(lastGemBalloonShown[projectDir], now)) return
+        lastGemBalloonShown[projectDir] = now
         try {
             val group =
                 com.intellij.notification.NotificationGroupManager
@@ -523,6 +526,31 @@ class DocscribeAnnotator : ExternalAnnotator<AnnotatorFileInfo, DocscribeOutput>
     @Suppress("CompanionObjectInExtension")
     companion object {
         private const val MAX_STDERR_PREVIEW = 200
+
+        /**
+         * Minimum interval between "gem not installed" balloons per project directory.
+         * Prevents spamming the user on every opened file when the gem is missing.
+         */
+        const val BALLOON_THROTTLE_MS = 15 * 60 * 1000L
+
+        /**
+         * Last shown timestamp of the "gem not installed" balloon per project directory.
+         */
+        @VisibleForTesting
+        internal val lastGemBalloonShown = ConcurrentHashMap<String, Long>()
+
+        /**
+         * Whether the "gem not installed" balloon may be shown now.
+         *
+         * @param lastShownMs Previous show timestamp, or `null` if never shown.
+         * @param nowMs Current time in milliseconds.
+         * @return `true` on first show or when [BALLOON_THROTTLE_MS] elapsed.
+         */
+        @JvmStatic
+        fun shouldShowGemBalloon(
+            lastShownMs: Long?,
+            nowMs: Long = System.currentTimeMillis(),
+        ): Boolean = lastShownMs == null || nowMs - lastShownMs >= BALLOON_THROTTLE_MS
 
         /**
          * Generation counter per file path.
