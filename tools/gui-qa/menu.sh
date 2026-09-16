@@ -4,6 +4,9 @@
 # Requires stand.sh first (qa-stand front, calc.rb open).
 menu_fire() {
   local tag="$1" row="$2" cx="${3:-500}" cy="${4:-140}"
+  gssh 'pkill -9 -x Terminal 2>/dev/null; pkill -9 -x man 2>/dev/null; pkill -9 -x less 2>/dev/null' >/dev/null 2>&1
+  sleep 2
+  activate || return 1
   unset ALL_PROXY HTTP_PROXY HTTPS_PROXY NODE_USE_ENV_PROXY all_proxy http_proxy https_proxy
   local ip; ip="$(tart ip "$VM")"
   escape

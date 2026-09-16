@@ -11,7 +11,8 @@
 # - Balloon lifetime short: screenshot within ~6s of Enter (missed at +12s).
 # - Shortcuts-conflict dialog ("Don't Show Again") dismissed once per IDE boot.
 # - Trust dialog ("Trust Project") clicked once per new project dir.
-# - Coordinates are @2x retina: click = OCR/2 (see click_text).
+# - Coordinates are @2x retina: click = OCR/2 (see click_text). CLICLICK
+#   ORIGIN (proven 2026-09-16): display top-left = (0,0), same as shots.
 # - VM IP floats: resolve via `tart ip` every run. Proxy vars break ssh/scp.
 # - RubyMine CLI in guest: ~/bin/rubymine (symlink to .app/MacOS/rubymine).
 
@@ -53,6 +54,11 @@ ocr_json() { "$VOCR" "$LAST_SHOT" 2>/dev/null }
 # (proven 2026-09-15: search box never opened, stale-box false greens).
 # Stdin bytes are literal — no quoting layers at all. Callers pass the
 # script as a single arg, no `-e`.
+# RETRY (proven 2026-09-16): guest osascript intermittently fails with
+# -10810/-600 (IDE busy/indexing) and SILENTLY sends nothing — the caller
+# then types into whatever has front. Retry 3x on empty output... but
+# osascript returns empty on SUCCESS too, so callers that need proof must
+# use osa_checked (returns output, fails when empty AND exit!=0).
 osa() { print -r -- "$*" | "${SSH[@]}" osascript; }
 
 # front_is_rubymine — hard gate before ANY keystroke batch. Returns 0 only
@@ -130,8 +136,12 @@ search_type() {
     activate || { echo "search_type: RubyMine not front, abort (no keystrokes sent)" >&2; return 1; }
     front_is_rubymine || { echo "search_type: lost front after activate, abort" >&2; return 1; }
     # Stale popup check: abort the attempt (Escape next round closes it).
+    # NOTE: the Search Everywhere *toggle button* ("Search Everywhere 1 1"
+    # + Run Anything/Go to File rows) is NOT a stale popup — it's the
+    # palette's mode switcher, always rendered once the box opens. Only
+    # RESULT rows (Recent Locations/Find Action/All/Classes/Files...) count.
     shot "search-pre-$tries"
-    if ocr_text | grep -qi "Recent Locations\|Find Action\|Search Everywhere"; then
+    if ocr_text | grep -qi "Recent Locations\|Find Action"; then
       echo "search_type try $tries: stale popup open, escape+retry" >&2
       escape
       sleep 1
@@ -148,6 +158,8 @@ search_type() {
     # Proof the box is open AND received the query: the query echo row
     # (large text, reliable). Footer "Include disabled actions" is small
     # gray text Vision misses ~1/3 runs — accept either.
+    # NOTE: the echo row may be a nearest-match with OCR noise ("Cumbold"
+    # for "Current"); ALWAYS verify plus the row DESCRIPTION below.
     if ocr_text | grep -qi "Include disabled actions"; then
       return 0
     fi
@@ -157,6 +169,34 @@ search_type() {
     echo "search_type try $tries: box not open, retry" >&2
   done
   return 1
+}
+
+# search_fire <query> <tag> — search_type + Enter, with the Settings-trap
+# guard: if Enter landed in Settings (query matched a Settings row better
+# than the action), the shot shows the Settings dialog — caller must treat
+# as failure, NOT as the action result (proven 2026-09-16: Enter on
+# "Update Types from RBS" opened Settings > Plugins, balloon oracle then
+# read the Plugins page).
+# MAN-PAGE GUARD (proven 2026-09-16): queries containing '_' (update_types,
+# Close All Tabs...) trigger the macOS man-page service when ANY keystroke
+# leaks: Terminal opens "man <query>" and eats the rest. If the post-Enter
+# shot shows a man overlay, fail fast (caller retries after Terminal kill).
+search_fire() {
+  search_type "update_types" || return 1
+  sleep 2
+  shot "$2-palette"
+  search_enter
+  shot "$2"
+  if ocr_text | grep -qi "No manual entry\|^man \|manual entry for"; then
+    echo "search_fire $1: leaked to Terminal man page" >&2
+    escape; sleep 1; escape; sleep 2
+    return 1
+  fi
+  if ocr_text | grep -qi "Marketplace\|Select plugin to preview"; then
+    echo "search_fire $1: landed in Settings, not the action" >&2
+    escape; sleep 1; escape; sleep 2
+    return 1
+  fi
 }
 
 # search_enter — Enter + short settle (balloon must be shot within ~6s).
