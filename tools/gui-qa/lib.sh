@@ -34,6 +34,16 @@ LAST_SHOT=""
 
 gssh() { "${SSH[@]}" "$@" }
 
+# kill_terminal — pkill dregs ONLY. NEVER `tell application "Terminal"`:
+# an Application-tell LAUNCHES Terminal.app when absent, and the newborn
+# window steals front seconds later, right under our chord (proven
+# 2026-09-16: front=Terminal after chord, menu bar Terminal over the
+# correctly-opened palette). All guest control goes via ssh anyway.
+kill_terminal() {
+  gssh 'pkill -9 -x Terminal 2>/dev/null; pkill -9 -x man 2>/dev/null; pkill -9 -x less 2>/dev/null' >/dev/null 2>&1
+  sleep 1
+}
+
 # shot <name> — guest screencapture + scp to host, sets LAST_SHOT.
 # Removes the previous file FIRST: a failed capture must leave NO file,
 # not a stale one (proven 2026-09-16: ocr matched a previous run's page
@@ -89,7 +99,7 @@ activate() {
     # as orphans and keep their windows (proven 2026-09-16: 21 man
     # windows, front=Terminal right after RubyMine-activate).
     if echo "$front" | grep -qi "terminal"; then
-      gssh 'pkill -9 -x Terminal 2>/dev/null; pkill -9 -x man 2>/dev/null; pkill -9 -x less 2>/dev/null' >/dev/null 2>&1
+      kill_terminal >/dev/null 2>&1
       sleep 2
     fi
     sleep 2
@@ -101,10 +111,17 @@ escape() {
   sleep 0.5
 }
 
+# escape_x2 — dismiss stacked dialogs (Settings + crash reporter + save
+# dialog can pile 2-3 deep; proven 2026-09-16: single escape left Settings
+# front, next shot read the Plugins page and the case asserted on garbage).
+escape_x2() {
+  escape; sleep 1; escape; sleep 2
+}
+
 # search_type <query> — Cmd+Shift+A, type query (no Enter). Idempotent:
 # leading Escape closes stale dialogs (a stale open Search would toggle shut
 # and eat the query).
-# LANDMINES (all proven 2026-09-16, full day burned):
+# LANDMINES (all proven 2026-09-15/16, full day burned):
 # 1. NEVER type while a Search/Recent popup is already open: the query text
 #    lands in the popup's own speed-search, never reaches the box, and the
 #    leaked keystrokes spawn Terminal man windows.
@@ -117,6 +134,14 @@ escape() {
 # 3. Cmd+Shift+A is OVERLOADED in RubyMine: first press opens "Recent
 #    Locations" (?), second press opens Search Everywhere. Blind Enter
 #    after one press fires the WRONG action.
+# 4. MAN-PAGE SERVICE (the big one, proven 2026-09-16): typing '_' (as in
+#    "update_types") into Search Everywhere triggers macOS "Open man Page
+#    for Selection" — Terminal opens "man <text>" ASYNCHRONOUSLY, seconds
+#    after the keystroke. The palette underneath still shows through, so
+#    OCR sees the query echo AND the man overlay in one shot. Mitigation:
+#    type the query in TWO chunks ("upd" + "ate_types") with a verify
+#    between: if the first chunk already spawned Terminal, abort before
+#    the '_' is ever typed.
 # Protocol: kill Terminal/man/less -> activate -> Escape (dismiss stale
 # popup) -> verify NO popup via OCR -> chord -> SHORT sleep -> front gate
 # -> type query IMMEDIATELY -> verify query echo via OCR -> Enter.
@@ -125,10 +150,36 @@ escape() {
 # a guest shell (man-page service: Terminal launches, "Open man Page for
 # Selection" eats the query, overlay poisons all oracles). Sleeps now 1s/2s
 # and every keystroke batch is front-gated.
+# open_palette — open Search Everywhere via MENU CLICKS (Navigate >
+# Search Everywhere), NOT a keyboard chord. Proven 2026-09-16: BOTH chord
+# paths are poisoned — osascript keystroke AND cliclick kd/ku trigger the
+# macOS man-page service ("Open man Page for Selection": Terminal steals
+# front, T=1, query lands in editor and CORRUPTS calc.rb). cliclick
+# kp:"cmd+shift+a" never opens the palette at all (6/6 no-shell). Menu
+# clicks open it cleanly (T=0, front stays rubymine, markers present).
+open_palette() {
+  unset ALL_PROXY HTTP_PROXY HTTPS_PROXY NODE_USE_ENV_PROXY all_proxy http_proxy https_proxy
+  local ip; ip="$(tart ip "$VM")"
+  ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 admin@"$ip" 'cliclick c:271,9; sleep 2' >/dev/null 2>&1
+  shot "palette-nav"
+  local se
+  se=$("$VOCR" "$SHOT_DIR/palette-nav.png" 2>/dev/null | python3 -c "
+import json,sys
+d = json.load(sys.stdin)
+for o in d:
+    if o['text'].strip()=='Search Everywhere':
+        print(f\"{int(o['x']/2)},{int(o['y']/2)}\")
+        break
+")
+  [[ -z "$se" ]] && { echo "open_palette: no Search Everywhere row" >&2; return 1; }
+  ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 admin@"$ip" "cliclick c:$se; sleep 2" >/dev/null 2>&1
+  front_is_rubymine || { echo "open_palette: lost front" >&2; return 1; }
+}
+
 search_type() {
   local tries i
   for (( tries = 1; tries <= 3; tries++ )); do
-    gssh 'pkill -9 -x Terminal 2>/dev/null; pkill -9 -x man 2>/dev/null; pkill -9 -x less 2>/dev/null' >/dev/null 2>&1
+    kill_terminal >/dev/null 2>&1
     sleep 1
     escape
     # Fail fast: NEVER type the query when RubyMine is not front — the text
@@ -147,23 +198,62 @@ search_type() {
       sleep 1
       continue
     fi
-    osa 'tell application "System Events" to keystroke "a" using {command down, shift down}' >/dev/null 2>&1
+    open_palette || { escape; sleep 1; continue; }
+    # Clear stale query: Search Everywhere RETAINS the previous query when
+    # reopened (proven 2026-09-16: "doctor" appended to "update_types" ->
+    # "update_typesdoctor" still ranked Update first, Enter fired the WRONG
+    # action). Cmd+A + Delete via osascript (proven clean: T=0; cliclick
+    # kp with modifiers DROPS the keys, proven same day).
+    osa 'tell application "System Events" to keystroke "a" using command down' >/dev/null 2>&1
     sleep 1
-    # Re-gate: any focus theft here means typing would hit a shell and
-    # spawn man windows that poison all later oracles. Abort, don't type.
-    front_is_rubymine || { echo "search_type: lost front before typing, abort" >&2; return 1; }
-    osa "tell application \"System Events\" to keystroke \"$1\"" >/dev/null 2>&1
-    sleep 2
-    shot "search-$tries"
-    # Proof the box is open AND received the query: the query echo row
-    # (large text, reliable). Footer "Include disabled actions" is small
-    # gray text Vision misses ~1/3 runs — accept either.
-    # NOTE: the echo row may be a nearest-match with OCR noise ("Cumbold"
-    # for "Current"); ALWAYS verify plus the row DESCRIPTION below.
-    if ocr_text | grep -qi "Include disabled actions"; then
-      return 0
+    osa 'tell application "System Events" to key code 51' >/dev/null 2>&1
+    sleep 1
+    # Gate 1: palette SHELL must be open BEFORE any typing — else the query
+    # lands in the editor and corrupts the fixture (proven 2026-09-16:
+    # chord missed, "update_types" typed into calc.rb -> "class
+    # Calcupdate-types", oracle then matched the query in the editor as a
+    # false positive). No shell -> escape + retry, zero keystrokes.
+    shot "search-open-$tries"
+    if ! ocr_text | grep -qi "Search Everywhere\|Find Action\|Recent Locations\|Include disabled actions\|Symbols"; then
+      echo "search_type try $tries: palette shell not open, escape+retry" >&2
+      escape; sleep 1
+      continue
     fi
-    if ocr_text | grep -qi "$1"; then
+    # Query typing via osascript keystroke (NOT cliclick t: — cliclick
+    # splits on spaces: `t:Check Entire Workspace` arrives as 3 argv and
+    # only "Check" is typed; proven 2026-09-17 while writing 3F). osa
+    # passes the script via stdin so spaces/quotes are literal. Palette
+    # opens by MENU now, so no chord/man-service risk on typing.
+    unset ALL_PROXY HTTP_PROXY HTTPS_PROXY NODE_USE_ENV_PROXY all_proxy http_proxy https_proxy
+    local qhead="$1" qtail=""
+    if [[ "$1" == *_* ]]; then
+      qhead="${1%%_*}"
+      qtail="_${1#*_}"
+    fi
+    osa "tell application \"System Events\" to keystroke \"$qhead\"" >/dev/null 2>&1
+    sleep 2
+    # Terminal check via pgrep (NOT System Events window count: querying
+    # `tell process "Terminal"` risks LAUNCHING Terminal.app when absent —
+    # same class of bug as the kill_terminal AppleScript tell, proven
+    # 2026-09-16). pgrep is side-effect free.
+    local tc
+    tc=$(gssh 'pgrep -x Terminal | wc -l' 2>/dev/null | tr -d ' ')
+    if [[ -n "$tc" && "$tc" != "0" ]]; then
+      echo "search_type try $tries: Terminal spawned mid-query, abort" >&2
+      escape; sleep 1
+      continue
+    fi
+    if [[ -n "$qtail" ]]; then
+      osa "tell application \"System Events\" to keystroke \"$qtail\"" >/dev/null 2>&1
+      sleep 2
+    fi
+    shot "search-$tries"
+    # Proof the box is open AND received the query: query echo PLUS a
+    # palette-shell marker. Query-alone is NOT proof — a missed chord types
+    # into the editor and the editor then contains the query (false positive
+    # proven 2026-09-16: "Calcupdate-types" in calc.rb matched "$1").
+    local stxt; stxt="$(ocr_text)"
+    if echo "$stxt" | grep -qi "$1" && echo "$stxt" | grep -qi "Search Everywhere\|Find Action\|Recent Locations\|Include disabled actions\|Symbols\|Update Types\|Check Entire Workspace\|Check Current File\|DocScribe Doctor"; then
       return 0
     fi
     echo "search_type try $tries: box not open, retry" >&2
@@ -182,19 +272,22 @@ search_type() {
 # leaks: Terminal opens "man <query>" and eats the rest. If the post-Enter
 # shot shows a man overlay, fail fast (caller retries after Terminal kill).
 search_fire() {
-  search_type "update_types" || return 1
+  # NOTE: $1 MUST be forwarded — a hardcoded "update_types" here silently
+  # fired Update for every caller (proven 2026-09-16: 3e7 doctor leg typed
+  # update_types, balloon asserted on the stale update result).
+  search_type "$1" || return 1
   sleep 2
   shot "$2-palette"
   search_enter
   shot "$2"
   if ocr_text | grep -qi "No manual entry\|^man \|manual entry for"; then
     echo "search_fire $1: leaked to Terminal man page" >&2
-    escape; sleep 1; escape; sleep 2
+    escape_x2
     return 1
   fi
   if ocr_text | grep -qi "Marketplace\|Select plugin to preview"; then
     echo "search_fire $1: landed in Settings, not the action" >&2
-    escape; sleep 1; escape; sleep 2
+    escape_x2
     return 1
   fi
 }

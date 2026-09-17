@@ -7,7 +7,7 @@ submenu_rows() { # $1=tag [rc-x] [rc-y]
   # Kill man-page Terminal first: a stale overlay eats the click and
   # poisons the shot (proven 2026-09-16: "man Update Types" overlay, no
   # DocScribe group found).
-  gssh 'pkill -9 -x Terminal 2>/dev/null; pkill -9 -x man 2>/dev/null; pkill -9 -x less 2>/dev/null' >/dev/null 2>&1
+  kill_terminal >/dev/null 2>&1
   sleep 2
   activate || return 1
   unset ALL_PROXY HTTP_PROXY HTTPS_PROXY NODE_USE_ENV_PROXY all_proxy http_proxy https_proxy

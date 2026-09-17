@@ -14,7 +14,7 @@ cleanup() { gssh 'mv ~/qa-stand/docscribe.yml.bak ~/qa-stand/docscribe.yml 2>/de
 open_project_dir "qa-stand" || { cleanup; exit 1; }
 # Terminal respawns steal front mid-search (proven 2026-09-16: second fire
 # aborted with front=Terminal). Pre-kill before each fire.
-gssh 'pkill -9 -x Terminal 2>/dev/null; pkill -9 -x man 2>/dev/null; pkill -9 -x less 2>/dev/null' >/dev/null 2>&1
+kill_terminal >/dev/null 2>&1
 sleep 2
 M0="$(log_mark)"
 fire_workspace "3d2-off" || { cleanup; fail "3d2" "workspace fire failed"; exit 1; }
@@ -24,7 +24,7 @@ echo "$L" | grep -q "rbs=false" || { echo "--- collectRubyFiles ---" >&2; echo "
 cleanup
 # Sanity: restored yml reports rbs=true again.
 open_project_dir "qa-stand" || exit 1
-gssh 'pkill -9 -x Terminal 2>/dev/null; pkill -9 -x man 2>/dev/null; pkill -9 -x less 2>/dev/null' >/dev/null 2>&1
+kill_terminal >/dev/null 2>&1
 sleep 2
 M1="$(log_mark)"
 fire_workspace "3d2-on" || { fail "3d2" "second fire failed"; exit 1; }

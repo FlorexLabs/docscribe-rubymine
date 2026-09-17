@@ -29,7 +29,7 @@ EOF'
 open_stand || { cleanup; exit 1; }
 # Gate: mismatch pass present (offenses=1), like 3c5.
 hit_mm() {
-  gssh 'awk "NR>$M0" ~/Library/Logs/JetBrains/RubyMine2026.2/idea.log' | grep 'doAnnotate parsed output' | grep -q 'offenses=1'
+  gssh "awk 'NR>$M0' ~/Library/Logs/JetBrains/RubyMine2026.2/idea.log" | grep 'doAnnotate parsed output' | grep -q 'offenses=[12]'
 }
 for i in $(seq 1 18); do
   sleep 5

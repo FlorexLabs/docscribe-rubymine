@@ -12,7 +12,7 @@ open_stand() {
 # Precondition: NO modal dialog open — Escape x2 up front (leftover
 # Settings covers the IDE; window-name checks pass while screenshots show
 # the dialog; proven 2026-09-15 AND 2026-09-16).
-escape; sleep 1; escape; sleep 2
+escape_x2
 # Reuse the live window when it already shows qa-stand (foreground CLI
 # spawns "Open Project" dialogs otherwise; proven 2026-09-15: 3b2 left a
 # qa-nogem2 window front and open_stand opened a THIRD window).

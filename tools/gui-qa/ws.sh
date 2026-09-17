@@ -59,15 +59,45 @@ for o in d:
 # fire_workspace <tag> — Search Everywhere -> Check Entire Workspace.
 # Pre-kills guest Terminal (respawn steals front mid-search; proven
 # 2026-09-16: abort with front=Terminal).
+# The check runs as a BACKGROUND task: the balloon lands ~10-30s after
+# Enter (7 files ~10s; 25+ files longer). Poll up to ~150s for a result
+# balloon; fail if none appears. Proven 2026-09-17 (probe-ws).
+# STALE-BALLOON GATE (proven 2026-09-17): a balloon from a PREVIOUS run
+# stays visible, so a naive text poll passes instantly on old content.
+# Gate on the LOG first: capture a line mark before firing, wait for a NEW
+# collectRubyFiles line (this run started), and only then accept balloon
+# text. Mark is taken inline (no anno.sh dependency — ws.sh is sourced
+# standalone by some cases).
 fire_workspace() {
-  gssh 'pkill -9 -x Terminal 2>/dev/null; pkill -9 -x man 2>/dev/null; pkill -9 -x less 2>/dev/null' >/dev/null 2>&1
+  kill_terminal >/dev/null 2>&1
   sleep 2
+  local mark
+  mark="$(gssh 'wc -l < ~/Library/Logs/JetBrains/RubyMine2026.2/idea.log' | tr -d ' \n')"
   search_type "Check Entire Workspace" || return 1
   sleep 2
   shot "$1-palette"
   ocr_text | grep -qi "Check Entire Workspace" || { echo "ws: no action row" >&2; return 1; }
   search_enter
-  shot "$1"
+  # Gate 1: this run actually started (new collect line after mark).
+  local i started=0
+  for i in $(seq 1 18); do
+    sleep 5
+    if gssh "awk 'NR>$mark' ~/Library/Logs/JetBrains/RubyMine2026.2/idea.log" 2>/dev/null | grep -q 'collectRubyFiles collected='; then
+      started=1
+      break
+    fi
+  done
+  [[ $started -eq 1 ]] || { echo "ws: no workspace run started in log within 90s" >&2; return 1; }
+  # Gate 2: result balloon of THIS run (log proof above rules out stale).
+  for i in $(seq 1 15); do
+    sleep 10
+    shot "$1" >/dev/null 2>&1
+    if ocr_text | grep -qi "checked .* file(s)\|no Ruby files found\|error running docscribe"; then
+      return 0
+    fi
+  done
+  echo "ws: no result balloon within 150s" >&2
+  return 1
 }
 
 # ws_flags <mark> <root-substr> — last collectRubyFiles line for root.

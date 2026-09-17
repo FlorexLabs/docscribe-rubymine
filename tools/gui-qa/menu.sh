@@ -4,7 +4,7 @@
 # Requires stand.sh first (qa-stand front, calc.rb open).
 menu_fire() {
   local tag="$1" row="$2" cx="${3:-500}" cy="${4:-140}"
-  gssh 'pkill -9 -x Terminal 2>/dev/null; pkill -9 -x man 2>/dev/null; pkill -9 -x less 2>/dev/null' >/dev/null 2>&1
+  kill_terminal >/dev/null 2>&1
   sleep 2
   activate || return 1
   unset ALL_PROXY HTTP_PROXY HTTPS_PROXY NODE_USE_ENV_PROXY all_proxy http_proxy https_proxy
@@ -66,6 +66,67 @@ for o in d:
   [[ -z "$xy" ]] && { echo ""; return 1; }
   ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 admin@"$ip" \
     "cliclick tc:$xy; sleep 1; cliclick kd:cmd t:c ku:cmd; sleep 1; pbpaste" 2>/dev/null
+}
+
+# doctor_report <tag> — full Doctor text via Notifications tool window.
+# The Doctor BALLOON is height-capped (~4 lines visible, rest clipped —
+# proven 2026-09-16: OCR sees title + project root only). The same report
+# sits complete in View > Tool Windows > Notifications: click the entry,
+# Cmd+A/Cmd+C (osascript, proven clean), pbpaste. Prints report to stdout.
+# View-menu coords: View=222,9 (proven via menubar OCR; stable across runs).
+doctor_report() {
+  local tag="$1"
+  activate || return 1
+  unset ALL_PROXY HTTP_PROXY HTTPS_PROXY NODE_USE_ENV_PROXY all_proxy http_proxy https_proxy
+  local ip; ip="$(tart ip "$VM")"
+  ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 admin@"$ip" 'cliclick c:222,9; sleep 2' >/dev/null 2>&1
+  shot "$tag-view"
+  local tw
+  tw=$("$VOCR" "$SHOT_DIR/$tag-view.png" 2>/dev/null | python3 -c "
+import json,sys
+d = json.load(sys.stdin)
+for o in d:
+    if o['text'].strip()=='Tool Windows':
+        print(f\"{int(o['x']/2)},{int(o['y']/2)}\")
+        break
+")
+  [[ -z "$tw" ]] && { echo "doctor_report $tag: no Tool Windows row" >&2; return 1; }
+  ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 admin@"$ip" "cliclick m:$tw; sleep 2" >/dev/null 2>&1
+  shot "$tag-twsub"
+  local nt
+  nt=$("$VOCR" "$SHOT_DIR/$tag-twsub.png" 2>/dev/null | python3 -c "
+import json,sys
+d = json.load(sys.stdin)
+for o in d:
+    if o['text'].strip()=='Notifications':
+        print(f\"{int(o['x']/2)},{int(o['y']/2)}\")
+        break
+")
+  [[ -z "$nt" ]] && { echo "doctor_report $tag: no Notifications row" >&2; return 1; }
+  ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 admin@"$ip" "cliclick c:$nt; sleep 3" >/dev/null 2>&1
+  shot "$tag-tw"
+  local dxy
+  dxy=$("$VOCR" "$SHOT_DIR/$tag-tw.png" 2>/dev/null | python3 -c "
+import json,sys
+d = json.load(sys.stdin)
+for o in sorted(d, key=lambda r: r['y']):
+    if 'DocScribe' in o['text'] and '===' in o['text']:
+        print(f\"{int((o['x']+o['w']/2)/2)},{int((o['y']+o['h']/2)/2)}\")
+        break
+")
+  [[ -z "$dxy" ]] && { echo "doctor_report $tag: no Doctor entry" >&2; return 1; }
+  ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 admin@"$ip" "cliclick c:$dxy; sleep 2" >/dev/null 2>&1
+  osa 'tell application "System Events" to keystroke "a" using command down' >/dev/null 2>&1
+  sleep 1
+  osa 'tell application "System Events" to keystroke "c" using command down' >/dev/null 2>&1
+  sleep 1
+  local rep
+  rep=$(gssh 'pbpaste' 2>/dev/null)
+  # Hide the tool window again (Shift+Escape), so later stand shots see
+  # the plain project layout.
+  osa 'tell application "System Events" to key code 53 using shift down' >/dev/null 2>&1
+  sleep 1
+  print -r -- "$rep"
 }
 
 # ocr_balloon <tag> — full balloon text via select+copy (fallback: OCR).
