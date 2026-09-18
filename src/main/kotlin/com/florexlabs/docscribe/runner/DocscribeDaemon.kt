@@ -51,7 +51,7 @@ import kotlin.concurrent.Volatile
  * - `update_types` — refresh YARD docs from RBS signatures.
  * - `shutdown` — graceful server stop.
  */
-@Suppress("TooManyFunctions")
+@Suppress("TooManyFunctions", "LargeClass")
 @Service(Service.Level.PROJECT)
 class DocscribeDaemon(
     private val project: Project,
@@ -942,6 +942,7 @@ class DocscribeDaemon(
         private const val SERVER_MODE_MIN_VERSION = "1.5.1"
         private const val BATCH_MODE_MIN_VERSION = "1.5.2"
         private const val CLI_OVERRIDES_MIN_VERSION = "1.6.2"
+        private const val VERSION_PARTS_COUNT = 3
 
         /**
          * Whether the daemon understands the `cli_overrides` RPC parameter.
@@ -958,7 +959,7 @@ class DocscribeDaemon(
         fun supportsCliOverrides(version: String?): Boolean {
             val v = version?.trim()?.takeIf { it.isNotEmpty() } ?: return true
             val parts = v.split(".").map { it.toIntOrNull() ?: return true }
-            return parts.size == 3 && atLeast(parts, CLI_OVERRIDES_MIN_VERSION)
+            return parts.size == VERSION_PARTS_COUNT && atLeast(parts, CLI_OVERRIDES_MIN_VERSION)
         }
 
         private val sharedGson by lazy { GsonBuilder().create() }
