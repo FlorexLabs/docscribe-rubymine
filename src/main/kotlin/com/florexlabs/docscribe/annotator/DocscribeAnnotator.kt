@@ -358,12 +358,23 @@ class DocscribeAnnotator : ExternalAnnotator<AnnotatorFileInfo, DocscribeOutput>
         if (annotationResult != null) {
             val projectDir = file.project.basePath ?: ""
             val useRbs = RbsDetector.shouldUseRbs(projectDir)
+            val warnInvalidYard =
+                try {
+                    DocscribeSettings.getInstance().warnOnInvalidYardTypes
+                } catch (_: Exception) {
+                    true
+                }
             for (parsedFile in annotationResult.files) {
                 for (offense in parsedFile.offenses) {
                     val isRbsTypeUpdateRaw = offense.copName == "Docscribe/UpdatedParam" || offense.copName == "Docscribe/UpdatedReturn"
                     val isInvalidYardRaw = offense.copName == "Docscribe/InvalidType"
                     val isError = offense.copName == "Docscribe/Error"
                     val isRbsSource = offense.source == "rbs" || offense.message.contains("RBS")
+                    // Warn toggle OFF hides syntax-driven InvalidType; RBS ones stay.
+                    if (isInvalidYardHidden(offense.copName, offense.source, offense.message, warnInvalidYard)) {
+                        log.info("DocScribe apply skipping InvalidType for $filePath (warnOnInvalidYardTypes=false)")
+                        continue
+                    }
                     val baseLine = (offense.location.startLine - 1).coerceIn(0, document.lineCount - 1)
                     // For RBS updates and invalid YARD, highlight the YARD comment, not the def. Errors stay on line 1.
                     val line =
@@ -409,8 +420,8 @@ class DocscribeAnnotator : ExternalAnnotator<AnnotatorFileInfo, DocscribeOutput>
                 }
             }
         }
-        // YARD syntax validation without RBS is now handled by the gem via --validate-types
-        // (Yard::Validator + TypeMismatchValidator) and appears as Docscribe/InvalidType above
+        // Syntax-driven InvalidType is filtered above when the warn setting is
+        // off (see isInvalidYardHidden); RBS-sourced InvalidType always shows.
     }
 
     private fun showGemNotInstalledBalloon(
@@ -551,6 +562,28 @@ class DocscribeAnnotator : ExternalAnnotator<AnnotatorFileInfo, DocscribeOutput>
             lastShownMs: Long?,
             nowMs: Long = System.currentTimeMillis(),
         ): Boolean = lastShownMs == null || nowMs - lastShownMs >= BALLOON_THROTTLE_MS
+
+        /**
+         * Whether a `Docscribe/InvalidType` offense should be hidden because the
+         * "Warn on invalid YARD types" setting is off. RBS-sourced offenses always
+         * stay visible — the toggle only gates syntax-driven ones.
+         *
+         * @param copName Cop name of the offense.
+         * @param source `source` field of the offense (`rbs`, `infer`, `syntax`, or `null`).
+         * @param message Offense message (legacy RBS marker fallback).
+         * @param warnInvalidYardTypes Current value of the setting.
+         * @return `true` when the offense must be skipped in [apply].
+         */
+        @JvmStatic
+        fun isInvalidYardHidden(
+            copName: String,
+            source: String?,
+            message: String,
+            warnInvalidYardTypes: Boolean,
+        ): Boolean {
+            if (copName != "Docscribe/InvalidType" || warnInvalidYardTypes) return false
+            return !(source == "rbs" || message.contains("RBS"))
+        }
 
         /**
          * Generation counter per file path.
