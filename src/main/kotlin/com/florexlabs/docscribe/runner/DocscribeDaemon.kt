@@ -166,7 +166,16 @@ class DocscribeDaemon(
         formatJson: Boolean = false,
     ): RunResult {
         val handle = synchronized(lock) { ensureRunning(projectDir) } ?: return fallback(command, file, projectDir, formatJson)
-        val params = if (command == "update_types") buildUpdateTypesParams(projectDir, file) else buildExecuteParams(file, projectDir)
+        // Daemons before 1.6.2 crash on ANY cli_overrides (their ConfigBuilder
+        // calls options[:include].any? on the partial hash -> NoMethodError).
+        // Omit overrides there; the daemon falls back to its docscribe.yml.
+        val includeCliOverrides = supportsCliOverrides(capabilities?.version)
+        val params =
+            if (command == "update_types") {
+                buildUpdateTypesParams(projectDir, file, includeCliOverrides)
+            } else {
+                buildExecuteParams(file, projectDir, includeCliOverrides)
+            }
         val response = performRpcCall(handle, command, params)
         // Fallback for older daemons that don't support update_types (< 1.6.2)
         if (command == "update_types" && isUnknownMethodError(response)) {
@@ -183,9 +192,10 @@ class DocscribeDaemon(
     internal fun buildUpdateTypesParams(
         projectDir: String?,
         file: String? = null,
+        includeCliOverrides: Boolean = true,
     ): Map<String, Any?> {
         val dir = projectDir ?: project.basePath ?: "."
-        return Companion.buildUpdateTypesParams(dir, file)
+        return Companion.buildUpdateTypesParams(dir, file, includeCliOverrides)
     }
 
     /**
@@ -209,7 +219,7 @@ class DocscribeDaemon(
             return fallback("check", file = null, projectDir = projectDir, formatJson = true)
         }
         val effectiveDir = projectDir ?: project.basePath ?: ""
-        val params = buildBatchParams(files, effectiveDir)
+        val params = buildBatchParams(files, effectiveDir, includeCliOverrides = supportsCliOverrides(capabilities?.version))
         val response = rpcCall(handle, "check_batch", params)
         return processBatchResponse(response, projectDir)
     }
@@ -274,6 +284,7 @@ class DocscribeDaemon(
     private fun buildExecuteParams(
         file: String?,
         projectDir: String?,
+        includeCliOverrides: Boolean = true,
     ): Map<String, Any?> {
         val dir = projectDir ?: project.basePath ?: ""
         val map =
@@ -282,6 +293,7 @@ class DocscribeDaemon(
                 "project_dir" to dir,
                 "no_boilerplate" to true,
             )
+        if (!includeCliOverrides) return map
         val cliOverrides = buildRbsCliOverrides(dir)
         if (cliOverrides != null) map["cli_overrides"] = cliOverrides
         return map
@@ -929,6 +941,26 @@ class DocscribeDaemon(
         private const val BATCH_PER_FILE_TIMEOUT_SECONDS = 120L
         private const val SERVER_MODE_MIN_VERSION = "1.5.1"
         private const val BATCH_MODE_MIN_VERSION = "1.5.2"
+        private const val CLI_OVERRIDES_MIN_VERSION = "1.6.2"
+
+        /**
+         * Whether the daemon understands the `cli_overrides` RPC parameter.
+         *
+         * Daemons before 1.6.2 merge overrides raw into `ConfigBuilder`, whose
+         * `filter_overrides?` calls `options[:include].any?` on the partial hash
+         * and crashes with `NoMethodError: undefined method 'any?' for nil`.
+         * Unknown versions are assumed new (preserves current behavior).
+         *
+         * @param version Full version string (e.g. `"1.6.2"`), or `null` if unknown.
+         * @return `true` unless the version is known to be older than 1.6.2.
+         */
+        @JvmStatic
+        fun supportsCliOverrides(version: String?): Boolean {
+            val v = version?.trim()?.takeIf { it.isNotEmpty() } ?: return true
+            val parts = v.split(".").map { it.toIntOrNull() ?: return true }
+            return parts.size == 3 && atLeast(parts, CLI_OVERRIDES_MIN_VERSION)
+        }
+
         private val sharedGson by lazy { GsonBuilder().create() }
 
         /**
@@ -944,6 +976,7 @@ class DocscribeDaemon(
             files: List<String>,
             projectDir: String,
             timeoutSeconds: Long = BATCH_PER_FILE_TIMEOUT_SECONDS,
+            includeCliOverrides: Boolean = true,
         ): Map<String, Any?> {
             val map =
                 mutableMapOf<String, Any?>(
@@ -952,6 +985,7 @@ class DocscribeDaemon(
                     "no_boilerplate" to true,
                     "timeout" to timeoutSeconds,
                 )
+            if (!includeCliOverrides) return map
             val cliOverrides = buildRbsCliOverridesStatic(projectDir)
             if (cliOverrides != null) map["cli_overrides"] = cliOverrides
             return map
@@ -992,9 +1026,11 @@ class DocscribeDaemon(
         internal fun buildUpdateTypesParams(
             projectDir: String,
             file: String? = null,
+            includeCliOverrides: Boolean = true,
         ): Map<String, Any?> {
             val map = mutableMapOf<String, Any?>("dir" to projectDir)
             if (file != null) map["file"] = file
+            if (!includeCliOverrides) return map
             val cliOverrides = buildRbsCliOverridesStatic(projectDir)
             if (cliOverrides != null) map["cli_overrides"] = cliOverrides
             return map
