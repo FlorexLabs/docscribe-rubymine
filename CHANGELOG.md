@@ -43,6 +43,8 @@
 - **Companion object warning** — `DocscribeAnnotator` `fileGeneration` map now suppressed with
   `// noinspection CompanionObjectInExtension` + `@Suppress("CompanionObjectInExtension")` (IDE inspection
   `Companion objects in IDE extensions may only contain a logger and constants`).
+- **Warn toggle hides invalid YARD types** — turning off "Warn on invalid YARD types" now hides syntax-driven
+  `Docscribe/InvalidType` annotations in the editor (RBS-sourced ones always stay visible).
 
 ### Changed
 
