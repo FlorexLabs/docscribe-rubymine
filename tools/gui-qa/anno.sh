@@ -87,6 +87,39 @@ if rows:
   activate || return 1
 }
 
+# open_exact_file <name> — like open_tree_file but matches the tree row by
+# EXACT stripped text (open_tree_file's substring match hits sig/calc.rbs
+# for 'calc.rb'... and worse: any row CONTAINING the name. Proven
+# 2026-09-18: open_tree_file bad.rb double-clicked calc.rb). Falls back to
+# substring when no exact row exists. Verifies the EDITOR shows the file
+# (breadcrumb), retries the double-click once on mismatch.
+open_exact_file() {
+  escape; escape
+  unset ALL_PROXY HTTP_PROXY HTTPS_PROXY NODE_USE_ENV_PROXY all_proxy http_proxy https_proxy
+  local ip; ip="$(tart ip "$VM")"
+  local try TXY
+  for try in 1 2 3 4; do
+    shot "extree-$1"
+    TXY=$(ocr_json | python3 -c "
+import json,sys
+d = json.load(sys.stdin)
+exact = [o for o in d if o['text'].strip()=='''$1''' and o['x'] < 600]
+rows = exact if exact else [o for o in d if '''$1''' in o['text'] and o['x'] < 600]
+rows.sort(key=lambda o: o['y'])
+if rows:
+    o = rows[0]
+    print(f\"{int((o['x']+o['w']/2)/2)},{int((o['y']+o['h']/2)/2)}\")
+")
+    [[ -z "$TXY" ]] && { sleep 10; continue; }
+    ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 admin@"$ip" "cliclick dc:$TXY" >/dev/null 2>&1
+    sleep 8
+    activate || return 1
+    shot "exver-$1"
+    if ocr_text | grep -qi "$1"; then return 0; fi
+  done
+  echo "open_exact_file $1: editor never showed $1" >&2; return 1
+}
+
 # open_intention <tag> [anchor] — click anchor in editor, Alt+Enter, shot.
 # Default anchor 'def add'. Caller greps rows from ocr_text (LAST_SHOT).
 open_intention() {

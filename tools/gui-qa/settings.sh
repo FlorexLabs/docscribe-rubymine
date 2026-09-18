@@ -14,6 +14,9 @@
 #   search filter, and open_stand tree shots).
 
 # xml_opt <name> — prints true|false|DEFAULT for a DocScribe setting.
+# NOTE: the file is options/docscribe-settings.xml (NOT the config root —
+# corrected 2026-09-18: it appears only after the first non-default Apply;
+# before that every read is DEFAULT, which is also correct).
 # NOTE: NEVER parse with `tr -d 'value="'` — tr strips CHARACTERS, so
 # "false" becomes "fs" and "true" becomes "tr" (proven 2026-09-16: every
 # settings_want verification failed while clicks+Apply actually worked).
@@ -124,28 +127,33 @@ if rows:
 
 # settings_checkbox_square <label-substr> <tag> — click the checkbox square
 # left of the label row. Page must already be visible. No Apply.
-# GEOMETRY (measured 2026-09-16): screenshot is FULL-SCREEN @2x, clicks are
-# logical (OCR/2). Label left edge @2x/2, square center ≈ 23px left of it
-# (old hardcoded 327 = 700/2-23, proven working). NOTE: -90 here once sent
-# clicks to x=260 = the TREE panel, flipping settings nodes instead of the
-# checkbox (toggled.png showed Keymap page). Verify post-click via xml.
+# GEOMETRY (measured 2026-09-18): label OCR x=700@2x => logical 350.
+# Clicks at x<=290 go to the TREE (page jumps to Appearance/Keymap —
+# proven: label disappeared after x=290..240 sweep); x=300/310 stay on
+# the page but hit label TEXT (no-op). The 16px checkbox center is at
+# logical x≈310... but WHICH of 300/310 is the square is unresolvable
+# via OCR (checkbox glyph has no text row). Strategy: click x=310, then
+# VERIFY the click LANDED on the page (label still visible); if the page
+# jumped, Escape out and fail loudly instead of clicking blind.
 settings_checkbox_square() {
   local lab="$1" tag="$2"
   shot "$tag-before"
-  local CX
-  CX=$(ocr_json | python3 -c "
+  local LY
+  LY=$(ocr_json | python3 -c "
 import json,sys
 d = json.load(sys.stdin)
 rows = [o for o in d if '''$lab''' in o['text']]
 if rows:
     o = rows[0]
-    print(f\"{int(o['x']/2)-25},{int((o['y']+o['h']/2)/2)}\")
+    print(int((o['y']+o['h']/2)/2))
 ")
-  [[ -z "$CX" ]] && { echo "settings: no row $lab" >&2; return 1; }
+  [[ -z "$LY" ]] && { echo "settings: no row $lab" >&2; return 1; }
   unset ALL_PROXY HTTP_PROXY HTTPS_PROXY NODE_USE_ENV_PROXY all_proxy http_proxy https_proxy
   local ip; ip="$(tart ip "$VM")"
-  ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 admin@"$ip" "cliclick c:$CX; sleep 2" >/dev/null 2>&1
+  ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 admin@"$ip" "cliclick c:310,$LY; sleep 2" >/dev/null 2>&1
   shot "$tag-toggled"
+  # Landed? The label row must STILL be visible (else we hit the tree).
+  ocr_text | grep -qi "$lab" || { echo "settings: click missed page (tree jump?)" >&2; return 1; }
 }
 
 # settings_apply_close — click Apply (dynamic coords), Escape-close dialog,
@@ -178,6 +186,11 @@ for o in d:
 
 # settings_want <true|false> <tag> — drive warnOnInvalidYardTypes to want,
 # verifying via xml (DEFAULT==true). Max 3 open/click/apply rounds.
+# settings_want <true|false> <tag> — drive warnOnInvalidYardTypes to want,
+# verifying via xml (DEFAULT==true). Max 3 open/click/apply rounds.
+# TOGGLE PATH (proven 2026-09-18 for Hide; same dialog): triple-click the
+# LABEL (focuses the checkbox) + Space toggles. The old
+# settings_checkbox_square (fixed x=310 click) hits label text = no-op.
 settings_want() {
   local want="$1" tag="$2" i V
   for i in 1 2 3; do
@@ -185,7 +198,21 @@ settings_want() {
     [[ "$V" == "DEFAULT" ]] && V=true
     [[ "$V" == "$want" ]] && return 0
     settings_open_page "$tag-$i" || return 1
-    settings_checkbox_square "Warn on invalid" "$tag-$i" || return 1
+    unset ALL_PROXY HTTP_PROXY HTTPS_PROXY NODE_USE_ENV_PROXY all_proxy http_proxy https_proxy
+    local ip; ip="$(tart ip "$VM")"
+    local LX
+    LX=$(ocr_json | python3 -c "
+import json,sys
+d = json.load(sys.stdin)
+for o in d:
+    if 'Warn on invalid' in o['text']:
+        print(f\"{int((o['x']+o['w']/2)/2)},{int((o['y']+o['h']/2)/2)}\")
+        break
+")
+    [[ -z "$LX" ]] && return 1
+    ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 admin@"$ip" "cliclick tc:$LX; sleep 1" >/dev/null 2>&1
+    osa 'tell application "System Events" to key code 49' >/dev/null 2>&1
+    sleep 2
     settings_apply_close || return 1
   done
   V="$(xml_opt warnOnInvalidYardTypes)"
