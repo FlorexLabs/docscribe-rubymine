@@ -1,13 +1,12 @@
 #!/bin/zsh
 # 3H.5 Warn toggle live: bad.rb with [Symbкol] (CYRILLIC к, U+043A) and NO
 # RBS (sig/ moved away). Settings ON -> annotator flags (offenses=1) +
-# intention fix row without restart. OFF leg: DRIFT (proven 2026-09-18) —
-# the gem ALWAYS emits invalid_type for syntax-broken YARD
-# (handle_existing_param -> invalid_yard_type? is unconditional; the
-# --validate-types flag only gates *mismatch-vs-inferred* reporting, and
-# the plugin's toggle is not even wired into RunOptions for CHECK). So OFF
-# still yields offenses=1. Assert ON (count + fix row); record OFF=1 as
-# drift in the note.
+# intention fix row without restart. OFF -> plugin filters the
+# syntax-driven InvalidType in apply() (log: "skipping InvalidType ..."),
+# RBS-sourced ones would stay. The gem still emits the offense (its
+# --validate-types flag only gates mismatch-vs-inferred reporting), so the
+# "apply ... offenses=1" line is pre-filter and CANNOT be the OFF oracle —
+# assert the skip line instead.
 cd "$(dirname "$0")/.." || exit 2
 source ./lib.sh || exit 2
 source ./menu.sh || exit 2
@@ -89,8 +88,10 @@ M1="$(log_mark)"
 rewrite_run '~/qa-stand/bad.rb'
 sleep 20
 A2="$(gssh "awk 'NR>$M1' ~/Library/Logs/JetBrains/RubyMine2026.2/idea.log" | grep -F 'DocScribe apply file=/Users/admin/qa-stand/bad.rb' | tail -n 1)"
-print -r -- "OFF apply (drift, still flagged): [$A2]" >&2
+SKIP2="$(gssh "awk 'NR>$M1' ~/Library/Logs/JetBrains/RubyMine2026.2/idea.log" | grep -F 'skipping InvalidType for /Users/admin/qa-stand/bad.rb' | tail -n 1)"
+[[ -n "$SKIP2" ]] || RC=2
+print -r -- "OFF skip line: [$SKIP2]" >&2
 cleanup
 if [[ $RC -eq 1 ]]; then fail "3h5" "no highlight when ON"; exit 1; fi
-fail "3h5" "OFF still flags InvalidType (gem always emits; toggle unwired for CHECK)"
-exit 1
+if [[ $RC -eq 2 ]]; then echo "--- log tail ---" >&2; echo "$A2" >&2; fail "3h5" "no skip line when OFF"; exit 1; fi
+pass "3h5"
