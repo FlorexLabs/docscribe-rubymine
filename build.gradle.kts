@@ -3,6 +3,7 @@ import org.jetbrains.intellij.platform.gradle.TestFrameworkType
 plugins {
     id("java")
     id("org.jetbrains.kotlin.jvm") version "2.3.0"
+    id("org.jetbrains.kotlin.plugin.serialization") version "2.3.0"
     id("org.jetbrains.intellij.platform") version "2.16.0"
     id("com.diffplug.spotless") version "8.6.0"
     id("dev.detekt") version "2.0.0-alpha.4"
@@ -11,6 +12,8 @@ plugins {
 
 group = "com.florexlabs"
 version = providers.gradleProperty("pluginVersion").get()
+
+val mcpEnabled = findProperty("mcpTest") == "true"
 
 repositories {
     mavenCentral()
@@ -24,10 +27,29 @@ dependencies {
     intellijPlatform {
         rubymine("2026.1")
         bundledPlugin("org.jetbrains.plugins.ruby")
+        if (mcpEnabled) bundledPlugin("com.intellij.mcpServer")
         testFramework(TestFrameworkType.Platform)
     }
 
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.1")
     testImplementation("junit:junit:4.13.2")
+    testImplementation("org.jetbrains.kotlin:kotlin-test:2.3.0")
+    testImplementation("org.mockito:mockito-core:5.11.0")
+    testImplementation("org.mockito.kotlin:mockito-kotlin:5.4.0")
+}
+
+sourceSets {
+    if (mcpEnabled) {
+        named("main") {
+            kotlin.srcDir("src/mcp/kotlin")
+            resources.srcDir("src/mcp/resources")
+        }
+    }
+    test {
+        kotlin {
+            exclude("**/mcp/**")
+        }
+    }
 }
 
 intellijPlatform {
@@ -43,15 +65,13 @@ intellijPlatform {
 
         changeNotes =
             """
-            <p>DocScribe 0.1.6: batched workspace checking, RubyMine 2026.1 – 2026.2 support.</p>
+            <p>DocScribe 0.1.7: RBS-aware inspections, Doctor RBS status, MCP API and i18n.</p>
             <ul>
-                <li>Workspace check now sends all Ruby files to the daemon in a single batch RPC call</li>
-                <li>Workspace check shows progress and can be cancelled</li>
-                <li>Requires docscribe gem &gt;= 1.5.2 for batch mode (falls back to CLI otherwise)</li>
-                <li>Supports RubyMine 2026.1 and 2026.2</li>
-                <li>Auto-generate YARD documentation for Ruby methods</li>
-                <li>Check file / workspace diagnostics</li>
-                <li>Safe and aggressive fix actions</li>
+                <li>RBS-aware check / safe fix / aggressive fix / workspace batch via auto-detect <code>sig/*.rbs</code> or <code>rbs</code> gem</li>
+                <li>Doctor shows <code>sig/</code>, <code>rbs</code> gem and <code>rbs.enabled</code></li>
+                <li>Annotator cache invalidates on RBS changes</li>
+                <li>Update Types via daemon with CLI fallback for old gems</li>
+                <li>MCP toolset for API testing (6 tools) and English/Russian localizations</li>
             </ul>
             """.trimIndent()
     }
@@ -107,6 +127,36 @@ tasks {
                 ?: System.getenv("DOCSCRIBE_LOCAL_GEM_PATH")
         if (localGemPath != null) {
             jvmArgs(listOf("-Ddocscribe.local.gem.path=$localGemPath"))
+        }
+    }
+    withType<Test> {
+        // MCP toolset is heavy (mcpServer 262+) and not needed for unit tests — exclude to keep CI 7m
+        exclude("**/mcp/**")
+    }
+    register("enableMcp") {
+        description = "Copy MCP toolset from src/mcp to src/main for local testing via JetBrains MCP"
+        group = "docscribe"
+        notCompatibleWithConfigurationCache("uses project.copy")
+        doLast {
+            copy {
+                from("src/mcp/kotlin/com/florexlabs/docscribe/mcp")
+                into("src/main/kotlin/com/florexlabs/docscribe/mcp")
+            }
+            copy {
+                from("src/mcp/resources/META-INF/withMcpServer.xml")
+                into("src/main/resources/META-INF")
+            }
+            println("✅ MCP enabled — run ./gradlew buildPlugin to include 6 tools in zip")
+        }
+    }
+    register("disableMcp") {
+        description = "Remove MCP toolset from src/main before push (keep CI 7m)"
+        group = "docscribe"
+        notCompatibleWithConfigurationCache("uses project.delete")
+        doLast {
+            delete("src/main/kotlin/com/florexlabs/docscribe/mcp")
+            delete("src/main/resources/META-INF/withMcpServer.xml")
+            println("✅ MCP disabled — CI will not see MCP files")
         }
     }
 }

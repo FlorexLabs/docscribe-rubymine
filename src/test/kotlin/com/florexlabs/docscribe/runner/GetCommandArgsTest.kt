@@ -77,4 +77,71 @@ class GetCommandArgsTest {
             )
         assertEquals(listOf("-A", "-k", "-B", "lib/foo.rb"), args)
     }
+
+    @Test
+    fun `check mode with rbs adds rbs flag`() {
+        val args =
+            DocscribeRunner.getCommandArgs(
+                strategy = DocscribeStrategy.CHECK,
+                formatJson = true,
+                filePath = "a.rb",
+                useRbs = true,
+                useRbsCollection = false,
+            )
+        assertEquals(listOf("--rbs", "--format", "json", "a.rb"), args)
+    }
+
+    @Test
+    fun `check mode with rbs collection adds both flags`() {
+        val args =
+            DocscribeRunner.getCommandArgs(
+                strategy = DocscribeStrategy.CHECK,
+                formatJson = false,
+                filePath = null,
+                useRbs = true,
+                useRbsCollection = true,
+            )
+        assertEquals(listOf("--rbs", "--rbs-collection"), args)
+    }
+
+    @Test
+    fun `safe mode with rbs uses aggressive flags for RBS types`() {
+        val args =
+            DocscribeRunner.getCommandArgs(
+                strategy = DocscribeStrategy.SAFE,
+                formatJson = false,
+                filePath = "foo.rb",
+                useRbs = true,
+                useRbsCollection = false,
+            )
+        assertEquals(listOf("-A", "-k", "-B", "--rbs", "foo.rb"), args)
+    }
+
+    @Test
+    fun `check mode with validate_types adds flag`() {
+        val args =
+            DocscribeRunner.getCommandArgs(
+                strategy = DocscribeStrategy.CHECK,
+                formatJson = true,
+                filePath = "a.rb",
+                useRbs = false,
+                useRbsCollection = false,
+                validateTypes = true,
+            )
+        assertEquals(listOf("--validate-types", "--format", "json", "a.rb"), args)
+    }
+
+    @Test
+    fun `check mode with rbs and validate_types adds both`() {
+        val args =
+            DocscribeRunner.getCommandArgs(
+                strategy = DocscribeStrategy.CHECK,
+                formatJson = false,
+                filePath = null,
+                useRbs = true,
+                useRbsCollection = false,
+                validateTypes = true,
+            )
+        assertEquals(listOf("--rbs", "--validate-types"), args)
+    }
 }

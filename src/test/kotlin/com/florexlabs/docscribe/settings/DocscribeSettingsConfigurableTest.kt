@@ -26,6 +26,13 @@ class DocscribeSettingsConfigurableTest : BasePlatformTestCase() {
         assertTrue(c.isModified)
     }
 
+    fun testIsModifiedAfterWarnInvalidToggle() {
+        val c = DocscribeSettingsConfigurable()
+        c.createComponent()
+        c.warnInvalidYardCheckBox.isSelected = !c.warnInvalidYardCheckBox.isSelected
+        assertTrue(c.isModified)
+    }
+
     fun testApplyPersistsHideComments() {
         val s = DocscribeSettings.getInstance()
         val originalHide = s.hideCommentsByDefault
@@ -37,6 +44,18 @@ class DocscribeSettingsConfigurableTest : BasePlatformTestCase() {
         s.hideCommentsByDefault = originalHide
     }
 
+    fun testApplyPersistsWarnInvalid() {
+        val s = DocscribeSettings.getInstance()
+        val original = s.warnOnInvalidYardTypes
+        val c = DocscribeSettingsConfigurable()
+        c.createComponent()
+        c.warnInvalidYardCheckBox.isSelected = !original
+        c.apply()
+        assertEquals(!original, s.warnOnInvalidYardTypes)
+        s.warnOnInvalidYardTypes = original
+        c.reset()
+    }
+
     fun testResetRestoresHideComments() {
         val s = DocscribeSettings.getInstance()
         s.hideCommentsByDefault = true
@@ -46,5 +65,16 @@ class DocscribeSettingsConfigurableTest : BasePlatformTestCase() {
         c.reset()
         assertTrue(c.hideCommentsCheckBox.isSelected)
         s.hideCommentsByDefault = false
+    }
+
+    fun testResetRestoresWarnInvalid() {
+        val s = DocscribeSettings.getInstance()
+        s.warnOnInvalidYardTypes = false
+        val c = DocscribeSettingsConfigurable()
+        c.createComponent()
+        c.warnInvalidYardCheckBox.isSelected = true
+        c.reset()
+        assertFalse(c.warnInvalidYardCheckBox.isSelected)
+        s.warnOnInvalidYardTypes = true
     }
 }

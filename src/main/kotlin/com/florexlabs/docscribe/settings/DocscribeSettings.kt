@@ -21,6 +21,13 @@ class DocscribeSettings : PersistentStateComponent<DocscribeSettings> {
     var hideCommentsByDefault: Boolean = false
 
     /**
+     * Whether to highlight YARD types with syntax errors even when no RBS signature exists.
+     * When true, types like `[Symbкol]` with Cyrillic or `[Array<]` with unclosed generic are
+     * highlighted as warnings. RBS mismatches are always highlighted regardless of this setting.
+     */
+    var warnOnInvalidYardTypes: Boolean = true
+
+    /**
      * Return this instance as the state to persist.
      */
     override fun getState(): DocscribeSettings = this

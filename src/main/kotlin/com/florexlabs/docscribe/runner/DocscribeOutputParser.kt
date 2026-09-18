@@ -24,6 +24,7 @@ data class ParsedOffense(
     val corrected: Boolean,
     val correctable: Boolean,
     val location: OffenseLocation,
+    val source: String? = null,
 )
 
 /**

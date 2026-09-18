@@ -61,6 +61,7 @@ class CheckWorkspaceAction : AnAction() {
                                 indicator.text = "DocScribe: checking files $from–$to of $total…"
                             },
                             executeChunk = { chunk ->
+                                // Ensure RBS types are considered for workspace checks, matching single-file check
                                 val result = DocscribeDaemon.executeBatchWithFallback(project, chunk, projectRoot)
                                 if (result.exitCode >= 2) {
                                     throw WorkspaceCheckFailedException(

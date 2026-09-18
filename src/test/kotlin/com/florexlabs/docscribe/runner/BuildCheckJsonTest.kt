@@ -144,6 +144,41 @@ class BuildCheckJsonTest {
         assertEquals(1, offense.location.lastColumn)
     }
 
+    @Test
+    fun `updated_param change maps to Docscribe UpdatedParam warning`() {
+        val changes = listOf(mapOf("line" to 13, "type" to "updated_param", "message" to "updated @param text from Object to Integer"))
+        val json = DocscribeDaemon.buildCheckJson("lib/factories/string_factory.rb", changes)
+        val output = parse(json)
+        val offense = output!!.files.single().offenses[0]
+        assertEquals("warning", offense.severity)
+        assertEquals("Docscribe/UpdatedParam", offense.copName)
+        assertEquals("updated @param text from Object to Integer", offense.message)
+        assertEquals(13, offense.location.startLine)
+    }
+
+    @Test
+    fun `updated_return change maps to Docscribe UpdatedReturn warning`() {
+        val changes = listOf(mapOf("line" to 20, "type" to "updated_return", "message" to "updated @return from Object to String"))
+        val json = DocscribeDaemon.buildCheckJson("lib/example.rb", changes)
+        val output = parse(json)
+        val offense = output!!.files.single().offenses[0]
+        assertEquals("warning", offense.severity)
+        assertEquals("Docscribe/UpdatedReturn", offense.copName)
+        assertEquals("updated @return from Object to String", offense.message)
+        assertEquals(20, offense.location.startLine)
+    }
+
+    @Test
+    fun `updated_param without message uses default`() {
+        val changes = listOf(mapOf("line" to 5, "type" to "updated_param"))
+        val json = DocscribeDaemon.buildCheckJson("test.rb", changes)
+        val output = parse(json)
+        val offense = output!!.files.single().offenses[0]
+        assertEquals("Docscribe/UpdatedParam", offense.copName)
+        assertEquals("warning", offense.severity)
+        assertEquals("updated @param type from RBS", offense.message)
+    }
+
     private fun parse(jsonString: String): DocscribeOutput? {
         val type = object : TypeToken<DocscribeOutput>() {}.type
         return try {

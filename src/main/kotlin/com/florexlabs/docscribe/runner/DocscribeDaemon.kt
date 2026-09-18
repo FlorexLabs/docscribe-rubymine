@@ -51,7 +51,7 @@ import kotlin.concurrent.Volatile
  * - `update_types` — refresh YARD docs from RBS signatures.
  * - `shutdown` — graceful server stop.
  */
-@Suppress("TooManyFunctions")
+@Suppress("TooManyFunctions", "LargeClass")
 @Service(Service.Level.PROJECT)
 class DocscribeDaemon(
     private val project: Project,
@@ -165,12 +165,37 @@ class DocscribeDaemon(
         projectDir: String? = null,
         formatJson: Boolean = false,
     ): RunResult {
-        synchronized(lock) {
-            val handle = ensureRunning(projectDir) ?: return fallback(command, file, projectDir, formatJson)
-            val params = buildExecuteParams(file, projectDir)
-            val response = performRpcCall(handle, command, params)
-            return processRpcResponse(response, command, file, projectDir, formatJson)
+        val handle = synchronized(lock) { ensureRunning(projectDir) } ?: return fallback(command, file, projectDir, formatJson)
+        // Daemons before 1.6.2 crash on ANY cli_overrides (their ConfigBuilder
+        // calls options[:include].any? on the partial hash -> NoMethodError).
+        // Omit overrides there; the daemon falls back to its docscribe.yml.
+        val includeCliOverrides = supportsCliOverrides(capabilities?.version)
+        val params =
+            if (command == "update_types") {
+                buildUpdateTypesParams(projectDir, file, includeCliOverrides)
+            } else {
+                buildExecuteParams(file, projectDir, includeCliOverrides)
+            }
+        val response = performRpcCall(handle, command, params)
+        // Fallback for older daemons that don't support update_types (< 1.6.2)
+        if (command == "update_types" && isUnknownMethodError(response)) {
+            log.warn("Daemon doesn't support update_types, falling back to CLI")
+            return fallback(command, file, projectDir, formatJson)
         }
+        return processRpcResponse(response, command, file, projectDir, formatJson)
+    }
+
+    @VisibleForTesting
+    internal fun isUnknownMethodError(response: Map<String, Any?>?): Boolean = Companion.isUnknownMethodError(response)
+
+    @VisibleForTesting
+    internal fun buildUpdateTypesParams(
+        projectDir: String?,
+        file: String? = null,
+        includeCliOverrides: Boolean = true,
+    ): Map<String, Any?> {
+        val dir = projectDir ?: project.basePath ?: "."
+        return Companion.buildUpdateTypesParams(dir, file, includeCliOverrides)
     }
 
     /**
@@ -188,16 +213,15 @@ class DocscribeDaemon(
         files: List<String>,
         projectDir: String? = null,
     ): RunResult {
-        synchronized(lock) {
-            val handle = ensureRunning(projectDir)
-            if (handle == null || capabilities?.batchMode != true) {
-                log.info("check_batch not available, using CLI directory scan")
-                return fallback("check", file = null, projectDir = projectDir, formatJson = true)
-            }
-            val params = buildBatchParams(files, projectDir ?: project.basePath ?: "")
-            val response = rpcCall(handle, "check_batch", params)
-            return processBatchResponse(response, projectDir)
+        val handle = synchronized(lock) { ensureRunning(projectDir) }
+        if (handle == null || capabilities?.batchMode != true) {
+            log.info("check_batch not available, using CLI directory scan")
+            return fallback("check", file = null, projectDir = projectDir, formatJson = true)
         }
+        val effectiveDir = projectDir ?: project.basePath ?: ""
+        val params = buildBatchParams(files, effectiveDir, includeCliOverrides = supportsCliOverrides(capabilities?.version))
+        val response = rpcCall(handle, "check_batch", params)
+        return processBatchResponse(response, projectDir)
     }
 
     /**
@@ -260,12 +284,45 @@ class DocscribeDaemon(
     private fun buildExecuteParams(
         file: String?,
         projectDir: String?,
-    ): Map<String, Any?> =
-        mutableMapOf<String, Any?>(
-            "file" to file,
-            "project_dir" to (projectDir ?: project.basePath ?: ""),
-            "no_boilerplate" to true,
-        )
+        includeCliOverrides: Boolean = true,
+    ): Map<String, Any?> {
+        val dir = projectDir ?: project.basePath ?: ""
+        val map =
+            mutableMapOf<String, Any?>(
+                "file" to file,
+                "project_dir" to dir,
+                "no_boilerplate" to true,
+            )
+        if (!includeCliOverrides) return map
+        val cliOverrides = buildRbsCliOverrides(dir)
+        if (cliOverrides != null) map["cli_overrides"] = cliOverrides
+        return map
+    }
+
+    private fun buildRbsCliOverrides(projectDir: String): Map<String, Any?>? {
+        val overrides = mutableMapOf<String, Any?>()
+        val useRbs = RbsDetector.shouldUseRbs(projectDir)
+        if (useRbs) {
+            overrides["rbs"] = true
+            if (RbsDetector.hasCollection(projectDir)) overrides["rbs_collection"] = true
+        }
+        // Always pass validate_types when the setting is enabled, even without RBS
+        // This lets the gem's Yard::Validator flag Sym bol / Objec3t without RBS
+        val shouldValidate =
+            try {
+                com.florexlabs.docscribe.settings.DocscribeSettings
+                    .getInstance()
+                    .warnOnInvalidYardTypes
+            } catch (_: Exception) {
+                false
+            }
+        if (shouldValidate) {
+            overrides["validate_types"] = true
+        }
+        if (overrides.isEmpty()) return null
+        // sig_dirs from default ['sig'] already handled by gem when rbs=true
+        return overrides
+    }
 
     /**
      * Route [command] to the appropriate RPC method and execute it.
@@ -281,12 +338,30 @@ class DocscribeDaemon(
         params: Map<String, Any?>,
     ): Map<String, Any?>? =
         when (command) {
-            "check" -> rpcCall(handle, "check", params)
-            "safe_fix" -> rpcCall(handle, "fix", params + mapOf("strategy" to "safe"))
-            "aggressive_fix" -> rpcCall(handle, "fix", params + mapOf("strategy" to "aggressive"))
-            "ping" -> rpcCall(handle, "ping")
-            "update_types" -> rpcCall(handle, "update_types")
-            else -> null
+            "check" -> {
+                rpcCall(handle, "check", params)
+            }
+
+            "safe_fix" -> {
+                // For RBS, use safe with -k to preserve docs ( DocscribeRunner SAFE with useRbs does -a -k -B)
+                rpcCall(handle, "fix", params + mapOf("strategy" to "safe"))
+            }
+
+            "aggressive_fix" -> {
+                rpcCall(handle, "fix", params + mapOf("strategy" to "aggressive"))
+            }
+
+            "ping" -> {
+                rpcCall(handle, "ping")
+            }
+
+            "update_types" -> {
+                rpcCall(handle, "update_types", params)
+            }
+
+            else -> {
+                null
+            }
         }
 
     /**
@@ -532,10 +607,32 @@ class DocscribeDaemon(
      * Caches the result in [docscribeStatus] so the check runs only once per session.
      * Shows a user-friendly notification (with "Open Gemfile" action) on first failure.
      */
+    @Volatile
+    private var lastGemfileLockMtime: Long = -1
+
+    private fun currentGemfileLockMtime(): Long {
+        val gemRoot = DocscribeRunner.findProjectRoot(project.basePath ?: "") ?: return -1
+        val lock = File(gemRoot, "Gemfile.lock")
+        return try {
+            if (lock.isFile) lock.lastModified() else -1
+        } catch (_: Exception) {
+            -1
+        }
+    }
+
+    @Suppress("CyclomaticComplexMethod")
     @VisibleForTesting
     internal fun performGemCheck() {
+        val curMtime = currentGemfileLockMtime()
+        if (docscribeStatus != DocscribeStatus.UNCHECKED && curMtime == lastGemfileLockMtime) return
+        // Gemfile.lock changed or first check — re-run
+        if (curMtime != lastGemfileLockMtime) {
+            docscribeStatus = DocscribeStatus.UNCHECKED
+            capabilities = null
+        }
         if (docscribeStatus != DocscribeStatus.UNCHECKED) return
         docscribeStatus = DocscribeStatus.MISSING // pessimistic default
+        lastGemfileLockMtime = curMtime
 
         val gemRoot = DocscribeRunner.findProjectRoot(project.basePath ?: "")
         if (gemRoot == null) {
@@ -844,6 +941,27 @@ class DocscribeDaemon(
         private const val BATCH_PER_FILE_TIMEOUT_SECONDS = 120L
         private const val SERVER_MODE_MIN_VERSION = "1.5.1"
         private const val BATCH_MODE_MIN_VERSION = "1.5.2"
+        private const val CLI_OVERRIDES_MIN_VERSION = "1.6.2"
+        private const val VERSION_PARTS_COUNT = 3
+
+        /**
+         * Whether the daemon understands the `cli_overrides` RPC parameter.
+         *
+         * Daemons before 1.6.2 merge overrides raw into `ConfigBuilder`, whose
+         * `filter_overrides?` calls `options[:include].any?` on the partial hash
+         * and crashes with `NoMethodError: undefined method 'any?' for nil`.
+         * Unknown versions are assumed new (preserves current behavior).
+         *
+         * @param version Full version string (e.g. `"1.6.2"`), or `null` if unknown.
+         * @return `true` unless the version is known to be older than 1.6.2.
+         */
+        @JvmStatic
+        fun supportsCliOverrides(version: String?): Boolean {
+            val v = version?.trim()?.takeIf { it.isNotEmpty() } ?: return true
+            val parts = v.split(".").map { it.toIntOrNull() ?: return true }
+            return parts.size == VERSION_PARTS_COUNT && atLeast(parts, CLI_OVERRIDES_MIN_VERSION)
+        }
+
         private val sharedGson by lazy { GsonBuilder().create() }
 
         /**
@@ -859,13 +977,65 @@ class DocscribeDaemon(
             files: List<String>,
             projectDir: String,
             timeoutSeconds: Long = BATCH_PER_FILE_TIMEOUT_SECONDS,
-        ): Map<String, Any?> =
-            mutableMapOf<String, Any?>(
-                "files" to files,
-                "project_dir" to projectDir,
-                "no_boilerplate" to true,
-                "timeout" to timeoutSeconds,
-            )
+            includeCliOverrides: Boolean = true,
+        ): Map<String, Any?> {
+            val map =
+                mutableMapOf<String, Any?>(
+                    "files" to files,
+                    "project_dir" to projectDir,
+                    "no_boilerplate" to true,
+                    "timeout" to timeoutSeconds,
+                )
+            if (!includeCliOverrides) return map
+            val cliOverrides = buildRbsCliOverridesStatic(projectDir)
+            if (cliOverrides != null) map["cli_overrides"] = cliOverrides
+            return map
+        }
+
+        @JvmStatic
+        internal fun buildRbsCliOverridesStatic(projectDir: String): Map<String, Any?>? {
+            val overrides = mutableMapOf<String, Any?>()
+            val useRbs = RbsDetector.shouldUseRbs(projectDir)
+            if (useRbs) {
+                overrides["rbs"] = true
+                if (RbsDetector.hasCollection(projectDir)) overrides["rbs_collection"] = true
+            }
+            val shouldValidate =
+                try {
+                    com.florexlabs.docscribe.settings.DocscribeSettings
+                        .getInstance()
+                        .warnOnInvalidYardTypes
+                } catch (_: Exception) {
+                    false
+                }
+            if (shouldValidate) {
+                overrides["validate_types"] = true
+            }
+            if (overrides.isEmpty()) return null
+            return overrides
+        }
+
+        @VisibleForTesting
+        @Suppress("MagicNumber")
+        internal fun isUnknownMethodError(response: Map<String, Any?>?): Boolean {
+            val error = response?.get("error") as? Map<*, *> ?: return false
+            val code = (error["code"] as? Number)?.toInt() ?: return false
+            return code == -32601
+        }
+
+        @VisibleForTesting
+        internal fun buildUpdateTypesParams(
+            projectDir: String,
+            file: String? = null,
+            includeCliOverrides: Boolean = true,
+        ): Map<String, Any?> {
+            val map = mutableMapOf<String, Any?>("dir" to projectDir)
+            if (file != null) map["file"] = file
+            if (!includeCliOverrides) return map
+            val cliOverrides = buildRbsCliOverridesStatic(projectDir)
+            if (cliOverrides != null) map["cli_overrides"] = cliOverrides
+            return map
+        }
 
         /**
          * Build a JSON-RPC 2.0 request string.
@@ -1012,8 +1182,10 @@ class DocscribeDaemon(
         /**
          * Convert a list of server changes into offense maps.
          *
-         * Each change is mapped to an offense with severity `convention`, cop name
-         * `DocScribe/MissingDocumentation`, and the change's line number (default 1).
+         * Each change is mapped to an offense. For RBS type updates (`:updated_param`,
+         * `:updated_return`) the cop name is `Docscribe/UpdatedParam` / `UpdatedReturn`
+         * with `warning` severity and the original message; otherwise it is
+         * `DocScribe/MissingDocumentation` with `convention`.
          * Non-map elements are skipped.
          *
          * @param changes The list of changes from the server response.
@@ -1023,20 +1195,44 @@ class DocscribeDaemon(
             changes.mapNotNull { change ->
                 if (change is Map<*, *>) {
                     val line = (change["line"] as? Number)?.toInt() ?: 1
-                    mapOf(
-                        "severity" to "convention",
-                        "cop_name" to "DocScribe/MissingDocumentation",
-                        "message" to "Missing YARD documentation",
-                        "corrected" to false,
-                        "correctable" to true,
-                        "location" to
-                            mapOf(
-                                "start_line" to line,
-                                "start_column" to 1,
-                                "last_line" to line,
-                                "last_column" to 1,
-                            ),
-                    )
+                    val type = change["type"]?.toString() ?: ""
+                    val rawMessage = change["message"]?.toString()
+                    val source = change["source"]?.toString()
+                    val (copName, severity, message) =
+                        when (type) {
+                            "updated_param" -> {
+                                Triple("Docscribe/UpdatedParam", "warning", rawMessage ?: "updated @param type from RBS")
+                            }
+
+                            "updated_return" -> {
+                                Triple("Docscribe/UpdatedReturn", "warning", rawMessage ?: "updated @return type from RBS")
+                            }
+
+                            "invalid_type", "invalid_syntax", "type_mismatch_param", "type_mismatch_return" -> {
+                                Triple("Docscribe/InvalidType", "warning", rawMessage ?: "invalid YARD type")
+                            }
+
+                            else -> {
+                                Triple("DocScribe/MissingDocumentation", "convention", rawMessage ?: "Missing YARD documentation")
+                            }
+                        }
+                    val offense =
+                        mutableMapOf<String, Any>(
+                            "severity" to severity,
+                            "cop_name" to copName,
+                            "message" to message,
+                            "corrected" to false,
+                            "correctable" to true,
+                            "location" to
+                                mapOf(
+                                    "start_line" to line,
+                                    "start_column" to 1,
+                                    "last_line" to line,
+                                    "last_column" to 1,
+                                ),
+                        )
+                    if (source != null) offense["source"] = source
+                    offense
                 } else {
                     null
                 }
