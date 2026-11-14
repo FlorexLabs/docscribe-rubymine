@@ -10,6 +10,7 @@ import com.florexlabs.docscribe.settings.DocscribeSettings
 import com.intellij.lang.annotation.AnnotationHolder
 import com.intellij.lang.annotation.ExternalAnnotator
 import com.intellij.lang.annotation.HighlightSeverity
+import com.intellij.openapi.components.service
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.project.Project
@@ -162,22 +163,22 @@ class DocscribeAnnotator : ExternalAnnotator<AnnotatorFileInfo, DocscribeOutput>
         // Must use ReadAction for getDocument/isDocumentUnsaved (background thread has no read access).
         try {
             val shouldSave =
-                com.intellij.openapi.application.ReadAction.compute<Boolean, RuntimeException> {
+                com.intellij.openapi.application.ReadAction.computeBlocking<Boolean, RuntimeException> {
                     val vFile =
                         com.intellij.openapi.vfs.LocalFileSystem
                             .getInstance()
-                            .findFileByPath(filePath) ?: return@compute false
-                    val doc = FileDocumentManager.getInstance().getDocument(vFile) ?: return@compute false
+                            .findFileByPath(filePath) ?: return@computeBlocking false
+                    val doc = FileDocumentManager.getInstance().getDocument(vFile) ?: return@computeBlocking false
                     FileDocumentManager.getInstance().isDocumentUnsaved(doc)
                 }
             if (shouldSave) {
                 com.intellij.openapi.application.ApplicationManager.getApplication().invokeAndWait {
-                    com.intellij.openapi.application.ReadAction.run<RuntimeException> {
+                    com.intellij.openapi.application.ReadAction.runBlocking<RuntimeException> {
                         val vFile =
                             com.intellij.openapi.vfs.LocalFileSystem
                                 .getInstance()
-                                .findFileByPath(filePath) ?: return@run
-                        val doc = FileDocumentManager.getInstance().getDocument(vFile) ?: return@run
+                                .findFileByPath(filePath) ?: return@runBlocking
+                        val doc = FileDocumentManager.getInstance().getDocument(vFile) ?: return@runBlocking
                         if (FileDocumentManager.getInstance().isDocumentUnsaved(doc)) {
                             FileDocumentManager.getInstance().saveDocument(doc)
                         }
@@ -459,8 +460,8 @@ class DocscribeAnnotator : ExternalAnnotator<AnnotatorFileInfo, DocscribeOutput>
                                     .getInstance()
                                     .refreshAndFindFileByIoFile(gemFile)
                             if (vFile != null) {
-                                com.intellij.openapi.fileEditor.FileEditorManager
-                                    .getInstance(project)
+                                project
+                                    .service<com.intellij.openapi.fileEditor.FileEditorManager>()
                                     .openFile(vFile, true)
                             }
                             group
