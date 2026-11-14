@@ -10,6 +10,7 @@ import com.florexlabs.docscribe.settings.DocscribeSettings
 import com.intellij.lang.annotation.AnnotationHolder
 import com.intellij.lang.annotation.ExternalAnnotator
 import com.intellij.lang.annotation.HighlightSeverity
+import com.intellij.openapi.components.service
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.project.Project
@@ -459,8 +460,8 @@ class DocscribeAnnotator : ExternalAnnotator<AnnotatorFileInfo, DocscribeOutput>
                                     .getInstance()
                                     .refreshAndFindFileByIoFile(gemFile)
                             if (vFile != null) {
-                                com.intellij.openapi.fileEditor.FileEditorManager
-                                    .getInstance(project)
+                                project
+                                    .service<com.intellij.openapi.fileEditor.FileEditorManager>()
                                     .openFile(vFile, true)
                             }
                             group

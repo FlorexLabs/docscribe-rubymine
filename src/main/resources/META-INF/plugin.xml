@@ -19,6 +19,21 @@
     ]]></description>
 
   <change-notes><![CDATA[
+        <h3>0.2.0</h3>
+        <h4>Added</h4>
+        <ul>
+            <li>Support for <strong>RubyMine 2026.3</strong> (build <code>263.*</code>)</li>
+        </ul>
+        <h4>Changed</h4>
+        <ul>
+            <li>Version bumped from <code>0.1.7</code> to <code>0.2.0</code></li>
+            <li>Build target updated to RubyMine 2026.3; supported range is now 2026.1 – 2026.3</li>
+            <li><code>platformVersion</code> in <code>gradle.properties</code> now drives the target IDE</li>
+        </ul>
+        <h4>Fixed</h4>
+        <ul>
+            <li><code>FileEditorManager.getInstance</code> now goes through <code>project.service&lt;FileEditorManager&gt;()</code> — the 263 static access emitted a <code>Companion</code> reference that failed on 2026.1/2026.2</li>
+        </ul>
         <h3>0.1.7</h3>
         <h4>Added</h4>
         <ul>
@@ -115,8 +130,8 @@
         </ul>
     ]]></change-notes>
 
-  <version>0.1.7</version>
-  <idea-version since-build="261" until-build="262.*"/>
+  <version>0.2.0</version>
+  <idea-version since-build="261" until-build="263.*"/>
 
   <depends>com.intellij.modules.platform</depends>
   <depends optional="true" config-file="withRubyPlugin.xml">com.intellij.modules.ruby</depends>

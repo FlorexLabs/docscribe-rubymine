@@ -25,7 +25,7 @@ repositories {
 
 dependencies {
     intellijPlatform {
-        rubymine("2026.1")
+        rubymine(providers.gradleProperty("platformVersion").get())
         bundledPlugin("org.jetbrains.plugins.ruby")
         if (mcpEnabled) bundledPlugin("com.intellij.mcpServer")
         testFramework(TestFrameworkType.Platform)
@@ -65,13 +65,11 @@ intellijPlatform {
 
         changeNotes =
             """
-            <p>DocScribe 0.1.7: RBS-aware inspections, Doctor RBS status, MCP API and i18n.</p>
+            <p>DocScribe 0.2.0: RubyMine 2026.3 support.</p>
             <ul>
-                <li>RBS-aware check / safe fix / aggressive fix / workspace batch via auto-detect <code>sig/*.rbs</code> or <code>rbs</code> gem</li>
-                <li>Doctor shows <code>sig/</code>, <code>rbs</code> gem and <code>rbs.enabled</code></li>
-                <li>Annotator cache invalidates on RBS changes</li>
-                <li>Update Types via daemon with CLI fallback for old gems</li>
-                <li>MCP toolset for API testing (6 tools) and English/Russian localizations</li>
+                <li>Compatible with RubyMine 2026.3 (build <code>263.*</code>)</li>
+                <li>Supported range is now 2026.1 – 2026.3</li>
+                <li><code>FileEditorManager</code> is now resolved via the project service, fixing a 2026.1/2026.2 runtime failure</li>
             </ul>
             """.trimIndent()
     }
@@ -85,8 +83,8 @@ intellijPlatform {
     pluginVerification {
         ides {
             create("RM", "2026.1") {} // oldest supported line
-            create("RM", "2026.2") {} // 2026.2 GA
-            create("RM", "2026.2.1") {} // latest 2026.2 patch
+            create("RM", "2026.2.4") {} // latest 2026.2 patch
+            create("RM", "2026.3") {} // 2026.3 GA
         }
     }
 
