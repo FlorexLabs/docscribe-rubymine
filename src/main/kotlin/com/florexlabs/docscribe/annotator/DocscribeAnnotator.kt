@@ -163,22 +163,22 @@ class DocscribeAnnotator : ExternalAnnotator<AnnotatorFileInfo, DocscribeOutput>
         // Must use ReadAction for getDocument/isDocumentUnsaved (background thread has no read access).
         try {
             val shouldSave =
-                com.intellij.openapi.application.ReadAction.compute<Boolean, RuntimeException> {
+                com.intellij.openapi.application.ReadAction.computeBlocking<Boolean, RuntimeException> {
                     val vFile =
                         com.intellij.openapi.vfs.LocalFileSystem
                             .getInstance()
-                            .findFileByPath(filePath) ?: return@compute false
-                    val doc = FileDocumentManager.getInstance().getDocument(vFile) ?: return@compute false
+                            .findFileByPath(filePath) ?: return@computeBlocking false
+                    val doc = FileDocumentManager.getInstance().getDocument(vFile) ?: return@computeBlocking false
                     FileDocumentManager.getInstance().isDocumentUnsaved(doc)
                 }
             if (shouldSave) {
                 com.intellij.openapi.application.ApplicationManager.getApplication().invokeAndWait {
-                    com.intellij.openapi.application.ReadAction.run<RuntimeException> {
+                    com.intellij.openapi.application.ReadAction.runBlocking<RuntimeException> {
                         val vFile =
                             com.intellij.openapi.vfs.LocalFileSystem
                                 .getInstance()
-                                .findFileByPath(filePath) ?: return@run
-                        val doc = FileDocumentManager.getInstance().getDocument(vFile) ?: return@run
+                                .findFileByPath(filePath) ?: return@runBlocking
+                        val doc = FileDocumentManager.getInstance().getDocument(vFile) ?: return@runBlocking
                         if (FileDocumentManager.getInstance().isDocumentUnsaved(doc)) {
                             FileDocumentManager.getInstance().saveDocument(doc)
                         }

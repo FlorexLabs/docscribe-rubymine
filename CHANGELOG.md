@@ -22,6 +22,11 @@
 - **Tests spawning real processes** — 263 moved `LocalProcessService` into `intellij.platform.ide.util.io.native`,
   whose descriptor is not loaded in the test application, so `OSProcessHandler.hasPty()` failed with
   "Cannot find service". Tests now register a stub via `LocalProcessServiceStub` (`src/test/.../runner/`).
+- **Deprecated `ReadAction.run` / `ReadAction.compute`** — replaced with the non-deprecated `runBlocking` /
+  `computeBlocking` in `DocscribeAnnotator` (same blocking semantics).
+- **Verifier "plugin configuration defect"** — `plugin.xml` declared an optional `com.intellij.mcpServer` dependency
+  whose `withMcpServer.xml` descriptor is not shipped in the standard build. The `<depends>` is now injected/removed by
+  `enableMcp` / `disableMcp` alongside the descriptor itself.
 
 ## [0.1.7] — 2026-08-25
 

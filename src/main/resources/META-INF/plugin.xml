@@ -33,6 +33,8 @@
         <h4>Fixed</h4>
         <ul>
             <li><code>FileEditorManager.getInstance</code> now goes through <code>project.service&lt;FileEditorManager&gt;()</code> — the 263 static access emitted a <code>Companion</code> reference that failed on 2026.1/2026.2</li>
+            <li>Deprecated <code>ReadAction.run</code>/<code>compute</code> replaced with <code>runBlocking</code>/<code>computeBlocking</code></li>
+            <li>Optional MCP dependency is no longer declared when its descriptor is not shipped (removes a plugin configuration defect)</li>
         </ul>
         <h3>0.1.7</h3>
         <h4>Added</h4>
@@ -135,7 +137,8 @@
 
   <depends>com.intellij.modules.platform</depends>
   <depends optional="true" config-file="withRubyPlugin.xml">com.intellij.modules.ruby</depends>
-  <depends optional="true" config-file="withMcpServer.xml">com.intellij.mcpServer</depends>
+  <!-- com.intellij.mcpServer is opted into by ./gradlew enableMcp; setMcpDepends keeps this in sync. -->
+  <!-- MCP_DEPENDS -->
 
   <extensions defaultExtensionNs="com.intellij">
     <applicationService serviceImplementation="com.florexlabs.docscribe.settings.DocscribeSettings"/>

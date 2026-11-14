@@ -144,6 +144,7 @@ tasks {
                 from("src/mcp/resources/META-INF/withMcpServer.xml")
                 into("src/main/resources/META-INF")
             }
+            setMcpDepends(inject = true)
             println("✅ MCP enabled — run ./gradlew buildPlugin to include 6 tools in zip")
         }
     }
@@ -154,7 +155,22 @@ tasks {
         doLast {
             delete("src/main/kotlin/com/florexlabs/docscribe/mcp")
             delete("src/main/resources/META-INF/withMcpServer.xml")
+            setMcpDepends(inject = false)
             println("✅ MCP disabled — CI will not see MCP files")
         }
     }
+}
+
+// The optional com.intellij.mcpServer <depends> must match withMcpServer.xml being present:
+// a config-file pointing at a missing file is a verifier "plugin configuration defect".
+fun setMcpDepends(inject: Boolean) {
+    val marker = "<!-- MCP_DEPENDS -->"
+    val depends = "$marker <depends optional=\"true\" config-file=\"withMcpServer.xml\">com.intellij.mcpServer</depends>"
+    val file = layout.projectDirectory.file("src/main/resources/META-INF/plugin.xml").asFile
+    val pattern =
+        Regex(
+            Regex.escape(marker) +
+                "( <depends optional=\"true\" config-file=\"withMcpServer\\.xml\">com\\.intellij\\.mcpServer</depends>)?",
+        )
+    file.writeText(file.readText().replace(pattern, if (inject) depends else marker))
 }
