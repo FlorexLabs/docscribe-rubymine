@@ -10,6 +10,7 @@ class DocscribeRunnerTest {
 
     @org.junit.Before
     fun setUp() {
+        LocalProcessServiceStub.ensureRegistered()
         try {
             val settings =
                 com.florexlabs.docscribe.settings.DocscribeSettings

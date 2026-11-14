@@ -8,6 +8,7 @@ import com.intellij.openapi.Disposable
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.components.Service
+import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.module.ModuleManager
@@ -699,7 +700,7 @@ class DocscribeDaemon(
                     if (gemFile.exists()) {
                         val vFile = LocalFileSystem.getInstance().refreshAndFindFileByIoFile(gemFile)
                         if (vFile != null) {
-                            FileEditorManager.getInstance(project).openFile(vFile, true)
+                            project.service<FileEditorManager>().openFile(vFile, true)
                         }
                     }
                 }

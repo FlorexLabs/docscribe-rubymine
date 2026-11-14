@@ -11,6 +11,7 @@ import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.CommonDataKeys
+import com.intellij.openapi.components.service
 import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.progress.ProgressIndicator
 import com.intellij.openapi.progress.Task
@@ -74,9 +75,7 @@ class UpdateTypesAction : AnAction() {
                         val vFile = LocalFileSystem.getInstance().findFileByPath(projectRoot)
                         vFile?.refresh(true, true)
                         val mgr = FileDocumentManager.getInstance()
-                        for (file in com.intellij.openapi.fileEditor.FileEditorManager
-                            .getInstance(project)
-                            .openFiles) {
+                        for (file in project.service<com.intellij.openapi.fileEditor.FileEditorManager>().openFiles) {
                             mgr.reloadFiles(file)
                         }
                     }

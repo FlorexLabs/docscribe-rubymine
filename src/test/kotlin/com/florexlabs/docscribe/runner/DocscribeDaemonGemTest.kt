@@ -3,6 +3,11 @@ package com.florexlabs.docscribe.runner
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 
 class DocscribeDaemonGemTest : BasePlatformTestCase() {
+    override fun setUp() {
+        super.setUp()
+        LocalProcessServiceStub.ensureRegistered()
+    }
+
     fun testExecuteReturnsDescriptiveErrorWhenDocscribeMissing() {
         val daemon = DocscribeDaemon(project)
         daemon.docscribeStatus = DocscribeDaemon.DocscribeStatus.MISSING

@@ -4,6 +4,7 @@ import com.florexlabs.docscribe.annotator.DocscribeAnnotatorCache
 import com.intellij.codeInsight.folding.CodeFoldingManager
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.Service
+import com.intellij.openapi.components.service
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.fileEditor.TextEditor
 import com.intellij.openapi.project.ProjectManager
@@ -55,7 +56,7 @@ internal class DocscribeSettingsChangeListenerImpl : DocscribeSettingsChangeList
         DocscribeAnnotatorCache.getInstance().clear()
         for (project in ProjectManager.getInstance().openProjects) {
             if (project.isDisposed) continue
-            val fileEditorManager = FileEditorManager.getInstance(project)
+            val fileEditorManager = project.service<FileEditorManager>()
             for (editor in fileEditorManager.allEditors) {
                 val textEditor = editor as? TextEditor ?: continue
                 CodeFoldingManager.getInstance(project).updateFoldRegionsAsync(textEditor.editor, true)

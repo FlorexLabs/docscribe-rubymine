@@ -1,5 +1,33 @@
 # Changelog
 
+## [0.2.0] — 2026-11-14
+
+### Added
+
+- **RubyMine 2026.3 support** — plugin builds and verifies against build `263.*`. `verifyPlugin` now targets
+  2026.1, 2026.2.4 and 2026.3.
+
+### Changed
+
+- **Target IDE** — `platformVersion` in `gradle.properties` now drives the resolved platform (was hardcoded
+  `rubymine("2026.1")` in `build.gradle.kts`); set to `2026.3`.
+- **Supported range** — `until-build` widened from `262.*` to `263.*`.
+- Version bumped from `0.1.7` to `0.2.0`.
+
+### Fixed
+
+- **`FileEditorManager.getInstance` broke 2026.1/2026.2** — in 263 the class is Kotlin, so calling its companion from
+  Kotlin emitted a `FileEditorManager.Companion` reference that older IDEs do not have (`NoSuchClassError` at audit).
+  All four call sites now use `project.service<FileEditorManager>()`, which resolves on every supported build.
+- **Tests spawning real processes** — 263 moved `LocalProcessService` into `intellij.platform.ide.util.io.native`,
+  whose descriptor is not loaded in the test application, so `OSProcessHandler.hasPty()` failed with
+  "Cannot find service". Tests now register a stub via `LocalProcessServiceStub` (`src/test/.../runner/`).
+- **Deprecated `ReadAction.run` / `ReadAction.compute`** — replaced with the non-deprecated `runBlocking` /
+  `computeBlocking` in `DocscribeAnnotator` (same blocking semantics).
+- **Verifier "plugin configuration defect"** — `plugin.xml` declared an optional `com.intellij.mcpServer` dependency
+  whose `withMcpServer.xml` descriptor is not shipped in the standard build. The `<depends>` is now injected/removed by
+  `enableMcp` / `disableMcp` alongside the descriptor itself.
+
 ## [0.1.7] — 2026-08-25
 
 ### Added
